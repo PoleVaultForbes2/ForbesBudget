@@ -1,3 +1,5 @@
+// App.tsx
+
 import { useState, useEffect, useCallback } from 'react'
 import type { MonthRecord, Transaction, CategoryConfig, Category } from './types/budget'
 import BudgetColumn from './components/BudgetColumn'
