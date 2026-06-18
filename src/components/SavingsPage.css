@@ -1,0 +1,68 @@
+.savings-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+  padding: 40px 24px;
+}
+
+.savings-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.savings-icon {
+  font-size: 3.5rem;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.savings-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #f0f2f8;
+  letter-spacing: -0.04em;
+  margin-bottom: 6px;
+}
+
+.savings-subtitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #60a5fa;
+  margin-bottom: 20px;
+}
+
+.savings-desc {
+  font-size: 0.9rem;
+  color: #6b7280;
+  line-height: 1.65;
+  margin-bottom: 32px;
+}
+
+.savings-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #1a1f2e;
+  border: 1px solid #2a2f42;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: #94a3b8;
+  opacity: 0.5;
+}
+
+.preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

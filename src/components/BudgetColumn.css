@@ -1,0 +1,217 @@
+.budget-column {
+  background: #1a1f2e;
+  border: 1px solid #2a2f42;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transition: border-color 0.2s;
+}
+
+.budget-column:hover {
+  border-color: var(--col-accent);
+}
+
+/* ── Header: ring + meta ── */
+.col-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress-ring {
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+}
+
+.ring-track {
+  fill: none;
+  stroke: #2a2f42;
+  stroke-width: 6;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--col-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.ring-fill.over {
+  stroke: #ef4444;
+}
+
+.ring-pct {
+  fill: #f0f2f8;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.ring-label {
+  fill: #6b7280;
+  font-size: 9px;
+  font-family: 'Inter', sans-serif;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.col-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.col-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--col-accent);
+  letter-spacing: -0.02em;
+}
+
+.col-alloc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Amount blocks ── */
+.col-amounts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.amount-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.amount-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  color: #f0f2f8;
+  white-space: nowrap;
+}
+
+.amount-value.spent { color: #94a3b8; }
+.amount-value.remaining { color: var(--col-accent); }
+.amount-value.over { color: #ef4444; }
+
+.amount-label {
+  font-size: 0.65rem;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Progress bar ── */
+.progress-bar-track {
+  height: 4px;
+  background: #2a2f42;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--col-accent);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  max-width: 100%;
+}
+
+.progress-bar-fill.over {
+  background: #ef4444;
+}
+
+/* ── Recent transactions ── */
+.recent-transactions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 80px;
+}
+
+.empty-state {
+  color: #4b5563;
+  font-size: 0.8rem;
+  text-align: center;
+  margin: auto 0;
+  font-style: italic;
+}
+
+.txn-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: #12172a;
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.txn-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.txn-desc {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txn-date {
+  font-size: 0.7rem;
+  color: #4b5563;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.txn-amount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--col-accent);
+  white-space: nowrap;
+}
+
+.more-hint {
+  font-size: 0.72rem;
+  color: #4b5563;
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Add button ── */
+.add-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed var(--col-accent);
+  border-radius: 10px;
+  color: var(--col-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+  margin-top: auto;
+}
+
+.add-btn:hover {
+  background: var(--col-accent);
+  color: #0d1117;
+}

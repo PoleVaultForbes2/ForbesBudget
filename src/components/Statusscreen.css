@@ -1,0 +1,59 @@
+.status-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+  gap: 14px;
+}
+
+.status-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #2a2f42;
+  border-top-color: #4ade80;
+  border-radius: 50%;
+  animation: status-spin 0.8s linear infinite;
+  margin-bottom: 6px;
+}
+
+@keyframes status-spin {
+  to { transform: rotate(360deg); }
+}
+
+.status-icon {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+
+.status-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f0f2f8;
+}
+
+.status-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.status-retry-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  background: #4ade80;
+  border: none;
+  border-radius: 10px;
+  color: #0d1117;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.status-retry-btn:hover {
+  opacity: 0.88;
+}

@@ -1,0 +1,425 @@
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --surface: #1a1f2e;
+  --border: #2a2f42;
+  --text: #f0f2f8;
+  --muted: #6b7280;
+  --green: #4ade80;
+  --blue: #60a5fa;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --danger: #ef4444;
+}
+
+html { font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Google Fonts — Inter + JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+/* ── App shell ── */
+.app {
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: rgba(13,17,23,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  font-size: 1.2rem;
+  color: var(--green);
+}
+
+.brand-name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.header-month {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Main ── */
+.app-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+/* ── Overview section ── */
+.overview {
+  margin-bottom: 36px;
+}
+
+.overview-income {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 20px;
+}
+
+.overview-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.income-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.income-display {
+  display: flex;
+  align-items: baseline;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.04em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.income-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.income-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.income-entry-label {
+  font-size: 0.7rem;
+  color: var(--green);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.income-dollar {
+  font-size: 2rem;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.income-input {
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--green);
+  color: var(--text);
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  width: 200px;
+  padding-bottom: 2px;
+}
+
+.income-action,
+.income-save-btn,
+.income-cancel-btn {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #12172a;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0 12px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.income-action:hover,
+.income-cancel-btn:hover {
+  border-color: #4b5563;
+  color: var(--text);
+}
+
+.income-action.primary,
+.income-save-btn {
+  background: rgba(74,222,128,0.12);
+  border-color: rgba(74,222,128,0.35);
+  color: var(--green);
+}
+
+.income-action.primary:hover,
+.income-save-btn:hover {
+  background: rgba(74,222,128,0.18);
+  border-color: rgba(74,222,128,0.55);
+}
+
+.income-input::-webkit-outer-spin-button,
+.income-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.income-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+.overview-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-val.spent { color: #94a3b8; }
+.stat-val.remaining { color: var(--green); }
+.stat-val.over { color: var(--danger); }
+
+.stat-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+}
+
+/* Global segmented progress bar */
+.global-bar-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.global-bar-segment {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.global-bar-legend {
+  display: flex;
+  gap: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Columns ── */
+.columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1200px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+  .income-display, .income-input {
+    font-size: 2rem;
+  }
+  .income-summary,
+  .income-edit {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-main {
+    padding: 20px 16px 60px;
+  }
+  .app-header {
+    padding: 12px 16px;
+  }
+  .income-input {
+    width: min(100%, 170px);
+  }
+  .income-actions {
+    width: 100%;
+  }
+}
+
+/* ── Page toggle ── */
+.page-toggle {
+  display: flex;
+  background: #12172a;
+  border: 1px solid #2a2f42;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.toggle-btn {
+  padding: 7px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.toggle-btn.active {
+  background: #1a1f2e;
+  color: #f0f2f8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.toggle-btn:not(.active):hover {
+  color: #94a3b8;
+}
+
+/* ── Month navigator ── */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.month-nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.month-nav-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f0f2f8;
+  letter-spacing: -0.02em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.month-archived-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+  background: rgba(251,191,36,0.12);
+  border: 1px solid rgba(251,191,36,0.3);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.month-nav-btn {
+  width: 38px;
+  height: 38px;
+  background: #1a1f2e;
+  border: 1px solid #2a2f42;
+  border-radius: 10px;
+  color: #94a3b8;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.month-nav-btn:hover:not(:disabled) {
+  border-color: #4b5563;
+  color: #f0f2f8;
+}
+
+.month-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ── Read-only notice ── */
+.readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  color: #fbbf24;
+  margin-bottom: 24px;
+}
+
+/* ── Income readonly state ── */
+.income-display.readonly {
+  cursor: default;
+  pointer-events: none;
+}

@@ -1,0 +1,62 @@
+.nmb-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, #1a2535, #1a1f2e);
+  border: 1px solid #60a5fa44;
+  border-left: 3px solid #60a5fa;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.nmb-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nmb-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.nmb-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f0f2f8;
+  margin-bottom: 2px;
+}
+
+.nmb-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.nmb-sub strong {
+  color: #60a5fa;
+}
+
+.nmb-btn {
+  padding: 10px 20px;
+  background: #60a5fa;
+  border: none;
+  border-radius: 8px;
+  color: #0d1117;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.nmb-btn:hover {
+  opacity: 0.88;
+}
