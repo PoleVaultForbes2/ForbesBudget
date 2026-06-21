@@ -1,4 +1,6 @@
 export type Category = 'essentials' | 'future' | 'joy' | 'tithe'
+export type JoyOwner = 'joshua' | 'sav'
+export type SavingsGoalKey = 'emergency' | 'general' | 'debt' | 'joy_savings'
 
 export interface Transaction {
   id: string
@@ -6,6 +8,7 @@ export interface Transaction {
   description: string
   date: string       // 'YYYY-MM-DD'
   amount: number
+  joyOwner?: JoyOwner
   note?: string
 }
 
@@ -15,6 +18,18 @@ export interface CategoryConfig {
   percentage: number
   color: string
   accentVar: string
+}
+
+export interface SavingsGoal {
+  key: SavingsGoalKey
+  label: string
+  balance: number
+}
+
+export interface SavingsState {
+  totalSavings: number
+  unallocated: number
+  goals: SavingsGoal[]
 }
 
 // A single month's worth of data (app-shape, used by components)
@@ -60,6 +75,22 @@ export interface DbTransactionRow {
   description: string
   date: string
   amount: number
+  joy_owner?: JoyOwner | null
   note: string | null
   created_at: string
+}
+
+export interface DbSavingsStateRow {
+  id: string
+  total_savings: number
+  unallocated: number
+  updated_at: string
+}
+
+export interface DbSavingsGoalRow {
+  id: string
+  state_id: string
+  key: SavingsGoalKey
+  label: string
+  balance: number
 }

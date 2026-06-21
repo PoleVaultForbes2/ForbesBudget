@@ -1,7 +1,14 @@
 // App.tsx
 
 import { useState, useEffect, useCallback } from 'react'
-import type { MonthRecord, Transaction, CategoryConfig, Category } from './types/budget'
+import type {
+  MonthRecord,
+  Transaction,
+  CategoryConfig,
+  Category,
+  SavingsState,
+  SavingsGoalKey,
+} from './types/budget'
 import BudgetColumn from './components/BudgetColumn'
 import TransactionLog from './components/TransactionLog'
 import CategorySettings from './components/CategorySettings'
@@ -9,6 +16,17 @@ import SavingsPage from './components/SavingsPage'
 import NewMonthBanner from './components/NewMonthBanner'
 import { LoadingScreen, ErrorScreen } from './components/StatusScreen'
 import SaveErrorToast from './components/SaveErrorToast'
+import {
+  addSavingsInflow,
+  autoAllocateSavings,
+  isSavingsContribution,
+  manuallyAllocateSavings,
+  normalizeSavingsState,
+  removeSavingsInflow,
+  setSavingsTotal,
+  transferSavings,
+  withdrawSavings,
+} from './lib/savings'
 import * as api from './api/budgetApi'
 import './App.css'
 
@@ -22,7 +40,7 @@ const DEFAULT_CATEGORIES: CategoryConfig[] = [
 ]
 
 const CATEGORY_PRESETS: Record<string, string[]> = {
-  essentials: ['Rent', 'Groceries', 'Gas', 'Take Out'],
+  essentials: ['Rent', 'Groceries', 'Gas', 'Take Out', 'Subs'],
   future: ['Retirement', 'Savings', 'Debt'],
   joy: ['Going out', 'Alcohol', 'Games'],
   tithe: ['Tithe'],
@@ -75,6 +93,7 @@ export default function App() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadErrorMsg, setLoadErrorMsg] = useState('')
   const [months, setMonths] = useState<MonthRecord[]>([])
+  const [savings, setSavings] = useState<SavingsState | null>(null)
   const [activeMonthKey, setActiveMonthKey] = useState<string>(toMonthKey(new Date()))
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -87,7 +106,11 @@ export default function App() {
   const loadData = useCallback(async () => {
     setLoadState('loading')
     try {
-      let fetched = await api.fetchAllMonths()
+      const [initialMonths, fetchedSavings] = await Promise.all([
+        api.fetchAllMonths(),
+        api.fetchSavingsState(),
+      ])
+      let fetched = initialMonths
 
       // First time ever running — no months exist yet, create the current one
       if (fetched.length === 0) {
@@ -102,6 +125,7 @@ export default function App() {
       }))
 
       setMonths(fetched)
+      setSavings(normalizeSavingsState(fetchedSavings))
       const latestKey = fetched.map(m => m.monthKey).sort().slice(-1)[0]
       setActiveMonthKey(latestKey)
       setLoadState('ready')
@@ -150,6 +174,37 @@ export default function App() {
     setSaveError(`Couldn't save your ${context}. Check your connection and try again.`)
   }
 
+  async function persistSavingsChange(
+    previousSavings: SavingsState,
+    nextSavings: SavingsState,
+    context: string
+  ) {
+    setSavings(nextSavings)
+    try {
+      await api.updateSavingsState(nextSavings)
+    } catch (err) {
+      console.error(err)
+      setSavings(previousSavings)
+      flashSaveError(context)
+    }
+  }
+
+  function buildSavingsInflowState(
+    currentSavings: SavingsState | null,
+    transaction: Omit<Transaction, 'id'> | Transaction
+  ): SavingsState | null {
+    if (!currentSavings || !isSavingsContribution(transaction)) return null
+    return addSavingsInflow(currentSavings, transaction.amount)
+  }
+
+  function buildSavingsRemovalState(
+    currentSavings: SavingsState | null,
+    transaction: Transaction
+  ): SavingsState | null {
+    if (!currentSavings || !isSavingsContribution(transaction)) return null
+    return removeSavingsInflow(currentSavings, transaction.amount)
+  }
+
   function startAddingIncome() {
     setIncomeInput('')
     setIncomeMode('add')
@@ -178,25 +233,42 @@ export default function App() {
     if (!activeMonth) return
     const tempId = generateTempId()
     const optimisticTxn: Transaction = { ...t, id: tempId }
+    const previousSavings = savings
+    const nextSavings = buildSavingsInflowState(previousSavings, t)
 
     // Optimistic update
     patchMonth(activeMonth.id, m => ({ ...m, transactions: [...m.transactions, optimisticTxn] }))
+    if (nextSavings) setSavings(nextSavings)
 
+    let saved: Transaction | null = null
     try {
-      const saved = await api.insertTransaction(activeMonth.id, t)
+      saved = await api.insertTransaction(activeMonth.id, t)
+      if (!saved) throw new Error('Transaction insert failed')
+      if (nextSavings) await api.updateSavingsState(nextSavings)
+
+      const committed = saved
+
       // Swap temp transaction for the real one (with real DB id)
       patchMonth(activeMonth.id, m => ({
         ...m,
-        transactions: m.transactions.map(txn => (txn.id === tempId ? saved : txn)),
+        transactions: m.transactions.map(txn => (txn.id === tempId ? committed : txn)),
       }))
     } catch (err) {
       console.error(err)
+      if (saved) {
+        try {
+          await api.deleteTransaction(saved.id)
+        } catch (cleanupErr) {
+          console.error(cleanupErr)
+        }
+      }
       // Roll back
       patchMonth(activeMonth.id, m => ({
         ...m,
         transactions: m.transactions.filter(txn => txn.id !== tempId),
       }))
-      flashSaveError('expense')
+      if (previousSavings) setSavings(previousSavings)
+      flashSaveError(nextSavings ? 'savings contribution' : 'expense')
     }
   }
 
@@ -204,16 +276,32 @@ export default function App() {
     if (!activeMonth) return
     const removed = activeMonth.transactions.find(t => t.id === id)
     if (!removed) return
+    const previousSavings = savings
+    const nextSavings = buildSavingsRemovalState(previousSavings, removed)
 
     // Optimistic update
     patchMonth(activeMonth.id, m => ({ ...m, transactions: m.transactions.filter(t => t.id !== id) }))
+    if (nextSavings) setSavings(nextSavings)
 
+    let savingsSaved = false
     try {
+      if (nextSavings) {
+        await api.updateSavingsState(nextSavings)
+        savingsSaved = true
+      }
       await api.deleteTransaction(id)
     } catch (err) {
       console.error(err)
+      if (savingsSaved && previousSavings) {
+        try {
+          await api.updateSavingsState(previousSavings)
+        } catch (rollbackErr) {
+          console.error(rollbackErr)
+        }
+      }
       // Roll back — restore the removed transaction
       patchMonth(activeMonth.id, m => ({ ...m, transactions: [...m.transactions, removed] }))
+      if (previousSavings) setSavings(previousSavings)
       flashSaveError('deletion')
     }
   }
@@ -239,6 +327,62 @@ export default function App() {
       patchMonth(activeMonth.id, m => ({ ...m, monthlyIncome: previousIncome }))
       flashSaveError(entryMode === 'add' ? 'paycheck' : 'budget amount')
     }
+  }
+
+  async function updateTotalSavings(totalSavings: number) {
+    if (!savings) return
+    const nextSavings = setSavingsTotal(savings, totalSavings)
+    if (!nextSavings) {
+      flashSaveError('savings total')
+      return
+    }
+
+    await persistSavingsChange(savings, nextSavings, 'savings total')
+  }
+
+  async function allocateSavingsManually(goalKey: SavingsGoalKey, amount: number) {
+    if (!savings) return
+    const nextSavings = manuallyAllocateSavings(savings, goalKey, amount)
+    if (!nextSavings) {
+      flashSaveError('savings allocation')
+      return
+    }
+
+    await persistSavingsChange(savings, nextSavings, 'savings allocation')
+  }
+
+  async function autoAllocateUnallocatedSavings() {
+    if (!savings) return
+    const nextSavings = autoAllocateSavings(savings)
+    if (!nextSavings) return
+
+    await persistSavingsChange(savings, nextSavings, 'savings allocation')
+  }
+
+  async function subtractFromSavingsGoal(goalKey: SavingsGoalKey, amount: number) {
+    if (!savings) return
+    const nextSavings = withdrawSavings(savings, goalKey, amount)
+    if (!nextSavings) {
+      flashSaveError('savings withdrawal')
+      return
+    }
+
+    await persistSavingsChange(savings, nextSavings, 'savings withdrawal')
+  }
+
+  async function moveSavingsBetweenGoals(
+    fromGoalKey: SavingsGoalKey,
+    toGoalKey: SavingsGoalKey,
+    amount: number
+  ) {
+    if (!savings) return
+    const nextSavings = transferSavings(savings, fromGoalKey, toGoalKey, amount)
+    if (!nextSavings) {
+      flashSaveError('savings transfer')
+      return
+    }
+
+    await persistSavingsChange(savings, nextSavings, 'savings transfer')
   }
 
   async function updateCategoryPercentage(key: Category, newPercentage: number) {
@@ -294,7 +438,7 @@ export default function App() {
 
   if (loadState === 'loading') return <LoadingScreen />
   if (loadState === 'error') return <ErrorScreen message={loadErrorMsg} onRetry={loadData} />
-  if (!activeMonth) return <LoadingScreen />
+  if (!activeMonth || !savings) return <LoadingScreen />
 
   return (
     <div className="app">
@@ -330,7 +474,14 @@ export default function App() {
       </header>
 
       {page === 'savings' ? (
-        <SavingsPage />
+        <SavingsPage
+          savings={savings}
+          onUpdateTotalSavings={updateTotalSavings}
+          onManualAllocate={allocateSavingsManually}
+          onAutoAllocate={autoAllocateUnallocatedSavings}
+          onWithdraw={subtractFromSavingsGoal}
+          onTransfer={moveSavingsBetweenGoals}
+        />
       ) : (
         <main className="app-main">
           {/* ── Month navigator ── */}

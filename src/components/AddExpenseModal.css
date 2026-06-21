@@ -81,6 +81,44 @@
   letter-spacing: 0.06em;
 }
 
+.joy-owner-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.joy-owner-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  background: #12172a;
+  border: 1px solid #2a2f42;
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.joy-owner-option {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 8px 10px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.joy-owner-option:hover {
+  color: #f0f2f8;
+}
+
+.joy-owner-option.active {
+  background: var(--modal-accent);
+  color: #0d1117;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.28);
+}
+
 .optional {
   font-weight: 400;
   color: #4b5563;

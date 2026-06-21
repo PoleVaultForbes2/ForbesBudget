@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Category, Transaction, CategoryConfig } from '../types/budget'
+import { getJoyOwnerForTransaction, getJoyOwnerLabel } from '../lib/joyOwners'
 import './TransactionLog.css'
 
 interface Props {
@@ -58,18 +59,24 @@ export default function TransactionLog({ transactions, categories, onDelete, rea
           </div>
           {filtered.map(t => {
             const cfg = getConfig(t.category)
+            const joyOwner = getJoyOwnerForTransaction(t)
             return (
               <div key={t.id} className="log-row">
                 <div className="log-desc-cell">
                   <span className="log-desc">{t.description}</span>
                   {t.note && <span className="log-note">{t.note}</span>}
                 </div>
-                <span
-                  className="log-cat-badge"
-                  style={{ '--badge-color': cfg.color } as React.CSSProperties}
-                >
-                  {cfg.label}
-                </span>
+                <div className="log-cat-cell">
+                  <span
+                    className="log-cat-badge"
+                    style={{ '--badge-color': cfg.color } as React.CSSProperties}
+                  >
+                    {cfg.label}
+                  </span>
+                  {joyOwner && (
+                    <span className="log-owner-badge">{getJoyOwnerLabel(joyOwner)}</span>
+                  )}
+                </div>
                 <span className="log-date">{formatDate(t.date)}</span>
                 <span
                   className="log-amount"

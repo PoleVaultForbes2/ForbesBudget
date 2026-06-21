@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CategoryConfig, Transaction } from '../types/budget'
+import { getJoyOwnerForTransaction, getJoyOwnerLabel, JOY_OWNER_OPTIONS } from '../lib/joyOwners'
 import AddExpenseModal from './AddExpenseModal'
 import './BudgetColumn.css'
 
@@ -19,6 +20,28 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
   const remaining = budget - spent
   const pct = budget > 0 ? Math.min(spent / budget, 1) : spent > 0 ? 1 : 0
   const overBudget = spent > budget
+  const isJoyColumn = config.key === 'joy'
+  const joySplitBudget = budget / JOY_OWNER_OPTIONS.length
+  const joySplits = isJoyColumn
+    ? JOY_OWNER_OPTIONS.map(owner => {
+        const ownerSpent = transactions
+          .filter(t => getJoyOwnerForTransaction(t) === owner.key)
+          .reduce((sum, t) => sum + t.amount, 0)
+        const ownerRemaining = joySplitBudget - ownerSpent
+        const ownerPct = joySplitBudget > 0
+          ? Math.min(ownerSpent / joySplitBudget, 1)
+          : ownerSpent > 0 ? 1 : 0
+
+        return {
+          ...owner,
+          color: owner.key === 'joshua' ? config.color : '#f472b6',
+          spent: ownerSpent,
+          remaining: ownerRemaining,
+          pct: ownerPct,
+          overBudget: ownerSpent > joySplitBudget,
+        }
+      })
+    : []
 
   // SVG ring math
   const R = 36
@@ -63,12 +86,39 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
         </div>
       </div>
  
-      <div className="progress-bar-track">
-        <div
-          className={`progress-bar-fill ${overBudget ? 'over' : ''}`}
-          style={{ width: `${pct * 100}%` }}
-        />
-      </div>
+      {isJoyColumn ? (
+        <div className="joy-split-bars">
+          {joySplits.map(split => (
+            <div
+              key={split.key}
+              className="joy-split-row"
+              style={{ '--joy-owner-color': split.color } as React.CSSProperties}
+            >
+              <div className="joy-split-meta">
+                <span className="joy-split-name">{split.label}</span>
+                <span className={`joy-split-left ${split.overBudget ? 'over' : ''}`}>
+                  {split.overBudget
+                    ? `$${formatMoney(Math.abs(split.remaining))} over`
+                    : `$${formatMoney(split.remaining)} left`}
+                </span>
+              </div>
+              <div className="joy-split-track">
+                <div
+                  className={`joy-split-fill ${split.overBudget ? 'over' : ''}`}
+                  style={{ width: `${split.pct * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="progress-bar-track">
+          <div
+            className={`progress-bar-fill ${overBudget ? 'over' : ''}`}
+            style={{ width: `${pct * 100}%` }}
+          />
+        </div>
+      )}
  
       <div className="recent-transactions">
         {transactions.length === 0 ? (
@@ -78,15 +128,21 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
             .slice()
             .sort((a, b) => b.date.localeCompare(a.date))
             .slice(0, 4)
-            .map(t => (
-              <div key={t.id} className="txn-row">
-                <div className="txn-left">
-                  <span className="txn-desc">{t.description}</span>
-                  <span className="txn-date">{formatDate(t.date)}</span>
+            .map(t => {
+              const joyOwner = getJoyOwnerForTransaction(t)
+              return (
+                <div key={t.id} className="txn-row">
+                  <div className="txn-left">
+                    <span className="txn-desc">{t.description}</span>
+                    <span className="txn-date">
+                      {formatDate(t.date)}
+                      {joyOwner && ` - ${getJoyOwnerLabel(joyOwner)}`}
+                    </span>
+                  </div>
+                  <span className="txn-amount">${t.amount.toFixed(2)}</span>
                 </div>
-                <span className="txn-amount">${t.amount.toFixed(2)}</span>
-              </div>
-            ))
+              )
+            })
         )}
         {transactions.length > 4 && (
           <p className="more-hint">+{transactions.length - 4} more in log</p>
@@ -116,4 +172,8 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
 function formatDate(iso: string) {
   const [y, m, d] = iso.split('-')
   return `${m}/${d}/${y}`
+}
+
+function formatMoney(amount: number) {
+  return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

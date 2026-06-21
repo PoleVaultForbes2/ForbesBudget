@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { Category, Transaction } from '../types/budget'
+import type { Category, JoyOwner, Transaction } from '../types/budget'
+import { DEFAULT_JOY_OWNER, JOY_OWNER_OPTIONS } from '../lib/joyOwners'
 import './AddExpenseModal.css'
 
 interface Props {
@@ -18,7 +19,9 @@ export default function AddExpenseModal({ category, categoryLabel, accentColor, 
   const [date, setDate] = useState(today())
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const [joyOwner, setJoyOwner] = useState<JoyOwner>(DEFAULT_JOY_OWNER)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const isJoyCategory = category === 'joy'
 
   function validate() {
     const e: Record<string, string> = {}
@@ -37,6 +40,7 @@ export default function AddExpenseModal({ category, categoryLabel, accentColor, 
       description: description.trim(),
       date,
       amount: parseFloat(parseFloat(amount).toFixed(2)),
+      joyOwner: isJoyCategory ? joyOwner : undefined,
       note: note.trim() || undefined,
     })
   }
@@ -54,6 +58,24 @@ export default function AddExpenseModal({ category, categoryLabel, accentColor, 
         </div>
 
         <div className="modal-body">
+          {isJoyCategory && (
+            <div className="joy-owner-section">
+              <span className="field-label">Joy Fund</span>
+              <div className="joy-owner-toggle" role="group" aria-label="Joy fund owner">
+                {JOY_OWNER_OPTIONS.map(owner => (
+                  <button
+                    key={owner.key}
+                    type="button"
+                    className={`joy-owner-option ${joyOwner === owner.key ? 'active' : ''}`}
+                    onClick={() => setJoyOwner(owner.key)}
+                  >
+                    {owner.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick Preset Selection Section */}
           {presets && presets.length > 0 && (
             <div className="preset-section">
