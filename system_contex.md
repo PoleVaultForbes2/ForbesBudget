@@ -91,7 +91,7 @@ create table savings_state (
 create table savings_goals (
   id uuid primary key default gen_random_uuid(),
   state_id text not null references savings_state(id) on delete cascade default 'shared',
-  key text not null check (key in ('emergency', 'general', 'debt', 'joy_savings')),
+  key text not null check (key in ('emergency', 'general', 'debt', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank')),
   label text not null,
   balance numeric(10, 2) not null default 0,
   unique (state_id, key)
@@ -162,7 +162,7 @@ create table if not exists savings_state (
 create table if not exists savings_goals (
   id uuid primary key default gen_random_uuid(),
   state_id text not null references savings_state(id) on delete cascade default 'shared',
-  key text not null check (key in ('emergency', 'general', 'debt', 'joy_savings')),
+  key text not null,
   label text not null,
   balance numeric(10, 2) not null default 0,
   unique (state_id, key)
@@ -185,13 +185,21 @@ insert into savings_state (id, total_savings, unallocated)
 values ('shared', 0, 0)
 on conflict (id) do nothing;
 
+alter table savings_goals drop constraint if exists savings_goals_key_check;
+alter table savings_goals
+  add constraint savings_goals_key_check
+  check (key in ('emergency', 'general', 'debt', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank'));
+
 insert into savings_goals (state_id, key, label, balance)
 values
   ('shared', 'emergency', 'Emergency Savings', 0),
   ('shared', 'general', 'General Savings', 0),
   ('shared', 'debt', 'Debt Savings', 0),
-  ('shared', 'joy_savings', 'Joy Savings', 0)
-on conflict (state_id, key) do nothing;
+  ('shared', 'joy_savings', 'Gifts & Travel', 0),
+  ('shared', 'josh_joy_bank', 'Josh Joy Bank', 0),
+  ('shared', 'wifey_joy_bank', 'Wifey Joy Bank', 0)
+on conflict (state_id, key) do update
+set label = excluded.label;
 ```
 
 ## Data Structures & Domains
@@ -203,14 +211,14 @@ on conflict (state_id, key) do nothing;
 A rigid framework partitioning monthly income across dynamic categories:
 * **Essentials (50%):** Static overheads (Rent, Groceries, Gas, Take Out).
 * **Future (30%):** Forward wealth generation and liabilities (Retirement, Savings, Debt).
-* **Joy (10%):** Guilt-free lifestyle spending (Going out, Alcohol, Games).
+* **Joy (10%):** Guilt-free lifestyle spending (Going out, Alcohol, Games, Joy Bank rollovers).
 * **Tithe (10%):** Giving allocation tracked as its own first-class budget category.
 
 ### Joy Split
 Joy remains a single top-level category to preserve the four-column dashboard. Inside the Joy column, the app splits the Joy budget 50/50 between Joshua and Sav and tracks each Joy transaction with `joyOwner`. Legacy Joy transactions without `joyOwner` display under Joshua by default.
 
 ### Shared Savings
-Savings is a single household pool stored in `savings_state` and split across `savings_goals`. The app maintains the invariant `totalSavings = unallocated + sum(goal balances)`. Future category transactions whose description is exactly `Savings` add to `unallocated` and the total savings pool. Auto-allocation distributes the full unallocated pool as Emergency 25%, General 25%, Debt 33.33%, and Joy Savings 16.67%, rounding the final bucket to preserve exact cents. Manual withdrawals subtract from a selected goal and reduce `totalSavings`; manual transfers move funds between goals without changing `totalSavings`.
+Savings is a single household pool stored in `savings_state` and split across `savings_goals`. The app maintains the invariant `totalSavings = unallocated + sum(goal balances)`. Future category transactions whose description is exactly `Savings` add to `unallocated` and the total savings pool. Joy category transactions whose description is exactly `Joy Bank` also add to `unallocated` while deducting from the Joy budget and the selected Joy owner. Auto-allocation distributes the full unallocated pool as Emergency 25%, General 25%, Debt 33.33%, and Gifts & Travel 16.67%, rounding that final auto bucket to preserve exact cents. Josh Joy Bank and Wifey Joy Bank are manual-only buckets for rolling leftover Joy funds into savings; manual withdrawals subtract from a selected goal and reduce `totalSavings`; manual transfers move funds between goals without changing `totalSavings`.
 
 ### Transactions
 Every ledger record is explicitly typed and constrained to:
@@ -240,6 +248,7 @@ These are the 4 categories with their subcategories we have so far:
 - Going Out
 - Alcohol
 - Games
+- Joy Bank
 
 ### Tithe
 - Tithe

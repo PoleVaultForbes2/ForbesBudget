@@ -346,6 +346,7 @@ export default function SavingsPage({
       <section className="savings-goals-grid">
         {savings.goals.map(goal => {
           const color = SAVINGS_GOAL_COLORS[goal.key]
+          const autoWeight = AUTO_ALLOCATION_WEIGHTS[goal.key]
           const share = savings.totalSavings > 0
             ? Math.min(goal.balance / savings.totalSavings, 1)
             : 0
@@ -359,7 +360,7 @@ export default function SavingsPage({
               <div className="goal-card-top">
                 <h2 className="goal-card-title">{goal.label}</h2>
                 <span className="goal-card-weight">
-                  {formatPercent(AUTO_ALLOCATION_WEIGHTS[goal.key])}
+                  {autoWeight === undefined ? 'Manual' : formatPercent(autoWeight)}
                 </span>
               </div>
               <span className="goal-card-balance">{formatMoney(goal.balance)}</span>

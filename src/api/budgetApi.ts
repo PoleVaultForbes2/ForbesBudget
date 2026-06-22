@@ -29,6 +29,15 @@ function isMissingTableError(error: unknown): boolean {
   )
 }
 
+function isCheckConstraintError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: string }).code === '23514'
+  )
+}
+
 // ─── Mappers: DB row shape → app shape ──────────────────────────
 
 function mapTransaction(row: DbTransactionRow): Transaction {
@@ -152,7 +161,9 @@ async function createDefaultSavingsState(): Promise<SavingsState> {
     .upsert(normalized.goals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
 
   if (goalsErr) {
-    if (isMissingTableError(goalsErr)) return normalizeSavingsState(DEFAULT_SAVINGS_STATE)
+    if (isMissingTableError(goalsErr) || isCheckConstraintError(goalsErr)) {
+      return normalizeSavingsState(DEFAULT_SAVINGS_STATE)
+    }
     throw goalsErr
   }
   return normalized
@@ -185,7 +196,10 @@ export async function fetchSavingsState(): Promise<SavingsState> {
       .from('savings_goals')
       .upsert(missingGoals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
 
-    if (missingErr) throw missingErr
+    if (missingErr) {
+      if (!isCheckConstraintError(missingErr)) throw missingErr
+      console.warn('Savings goal keys need the latest Supabase migration before new buckets can persist.')
+    }
   }
 
   const defaultGoalRows: DbSavingsGoalRow[] = missingGoals.map(goal => ({

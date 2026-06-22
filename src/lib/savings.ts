@@ -4,7 +4,9 @@ export const DEFAULT_SAVINGS_GOALS: SavingsGoal[] = [
   { key: 'emergency', label: 'Emergency Savings', balance: 0 },
   { key: 'general', label: 'General Savings', balance: 0 },
   { key: 'debt', label: 'Debt Savings', balance: 0 },
-  { key: 'joy_savings', label: 'Joy Savings', balance: 0 },
+  { key: 'joy_savings', label: 'Gifts & Travel', balance: 0 },
+  { key: 'josh_joy_bank', label: 'Josh Joy Bank', balance: 0 },
+  { key: 'wifey_joy_bank', label: 'Wifey Joy Bank', balance: 0 },
 ]
 
 export const SAVINGS_GOAL_COLORS: Record<SavingsGoalKey, string> = {
@@ -12,9 +14,18 @@ export const SAVINGS_GOAL_COLORS: Record<SavingsGoalKey, string> = {
   general: '#60a5fa',
   debt: '#f87171',
   joy_savings: '#fbbf24',
+  josh_joy_bank: '#c084fc',
+  wifey_joy_bank: '#f472b6',
 }
 
-export const AUTO_ALLOCATION_WEIGHTS: Record<SavingsGoalKey, number> = {
+export const AUTO_ALLOCATION_GOAL_KEYS: SavingsGoalKey[] = [
+  'emergency',
+  'general',
+  'debt',
+  'joy_savings',
+]
+
+export const AUTO_ALLOCATION_WEIGHTS: Partial<Record<SavingsGoalKey, number>> = {
   emergency: 0.25,
   general: 0.25,
   debt: 0.3333,
@@ -53,7 +64,12 @@ export function normalizeSavingsState(state: SavingsState): SavingsState {
 }
 
 export function isSavingsContribution(transaction: Pick<Transaction, 'category' | 'description'>): boolean {
-  return transaction.category === 'future' && transaction.description.trim().toLowerCase() === 'savings'
+  const description = transaction.description.trim().toLowerCase()
+
+  return (
+    (transaction.category === 'future' && description === 'savings') ||
+    (transaction.category === 'joy' && description === 'joy bank')
+  )
 }
 
 export function addSavingsInflow(state: SavingsState, amount: number): SavingsState {
@@ -167,15 +183,17 @@ export function autoAllocateSavings(state: SavingsState): SavingsState | null {
   if (pool <= 0) return null
 
   let allocatedSoFar = 0
-  const finalGoalKey = DEFAULT_SAVINGS_GOALS[DEFAULT_SAVINGS_GOALS.length - 1].key
+  const finalGoalKey = AUTO_ALLOCATION_GOAL_KEYS[AUTO_ALLOCATION_GOAL_KEYS.length - 1]
 
   return normalizeSavingsState({
     ...state,
     unallocated: 0,
     goals: state.goals.map(goal => {
+      if (!AUTO_ALLOCATION_GOAL_KEYS.includes(goal.key)) return goal
+
       const allocation = goal.key === finalGoalKey
         ? roundMoney(pool - allocatedSoFar)
-        : roundMoney(pool * AUTO_ALLOCATION_WEIGHTS[goal.key])
+        : roundMoney(pool * (AUTO_ALLOCATION_WEIGHTS[goal.key] ?? 0))
 
       allocatedSoFar = roundMoney(allocatedSoFar + allocation)
       return { ...goal, balance: roundMoney(goal.balance + allocation) }

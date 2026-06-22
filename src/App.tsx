@@ -42,7 +42,7 @@ const DEFAULT_CATEGORIES: CategoryConfig[] = [
 const CATEGORY_PRESETS: Record<string, string[]> = {
   essentials: ['Rent', 'Groceries', 'Gas', 'Take Out', 'Subs'],
   future: ['Retirement', 'Savings', 'Debt'],
-  joy: ['Going out', 'Alcohol', 'Games'],
+  joy: ['Going out', 'Alcohol', 'Games', 'Joy Bank'],
   tithe: ['Tithe'],
 }
 

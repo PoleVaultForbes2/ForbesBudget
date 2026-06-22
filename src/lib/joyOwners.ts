@@ -3,8 +3,8 @@ import type { Category, JoyOwner } from '../types/budget'
 export const DEFAULT_JOY_OWNER: JoyOwner = 'joshua'
 
 export const JOY_OWNER_LABELS: Record<JoyOwner, string> = {
-  joshua: 'Joshua',
-  sav: 'Sav',
+  joshua: 'Josh',
+  sav: 'Wifey',
 }
 
 export const JOY_OWNER_OPTIONS: Array<{ key: JoyOwner; label: string }> = [

@@ -1,6 +1,12 @@
 export type Category = 'essentials' | 'future' | 'joy' | 'tithe'
 export type JoyOwner = 'joshua' | 'sav'
-export type SavingsGoalKey = 'emergency' | 'general' | 'debt' | 'joy_savings'
+export type SavingsGoalKey =
+  | 'emergency'
+  | 'general'
+  | 'debt'
+  | 'joy_savings'
+  | 'josh_joy_bank'
+  | 'wifey_joy_bank'
 
 export interface Transaction {
   id: string
