@@ -4,9 +4,11 @@ export type SavingsGoalKey =
   | 'emergency'
   | 'general'
   | 'debt'
+  | 'roth_ira'
   | 'joy_savings'
   | 'josh_joy_bank'
   | 'wifey_joy_bank'
+export type SavingsTransactionType = 'deposit' | 'withdrawal'
 
 export interface Transaction {
   id: string
@@ -36,6 +38,16 @@ export interface SavingsState {
   totalSavings: number
   unallocated: number
   goals: SavingsGoal[]
+  transactions: SavingsTransaction[]
+}
+
+export interface SavingsTransaction {
+  id: string
+  type: SavingsTransactionType
+  amount: number
+  description: string
+  goalKey?: SavingsGoalKey
+  createdAt: string
 }
 
 // A single month's worth of data (app-shape, used by components)
@@ -99,4 +111,14 @@ export interface DbSavingsGoalRow {
   key: SavingsGoalKey
   label: string
   balance: number
+}
+
+export interface DbSavingsTransactionRow {
+  id: string
+  state_id: string
+  type: SavingsTransactionType
+  amount: number
+  description: string
+  goal_key: SavingsGoalKey | null
+  created_at: string
 }

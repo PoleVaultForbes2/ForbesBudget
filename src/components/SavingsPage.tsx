@@ -11,9 +11,14 @@ import './SavingsPage.css'
 interface Props {
   savings: SavingsState
   onUpdateTotalSavings: (totalSavings: number) => void | Promise<void>
+  onAddSavings: (amount: number) => void | Promise<void>
   onManualAllocate: (goalKey: SavingsGoalKey, amount: number) => void | Promise<void>
   onAutoAllocate: () => void | Promise<void>
-  onWithdraw: (goalKey: SavingsGoalKey, amount: number) => void | Promise<void>
+  onWithdraw: (
+    goalKey: SavingsGoalKey,
+    amount: number,
+    description: string
+  ) => void | Promise<void>
   onTransfer: (
     fromGoalKey: SavingsGoalKey,
     toGoalKey: SavingsGoalKey,
@@ -24,6 +29,7 @@ interface Props {
 export default function SavingsPage({
   savings,
   onUpdateTotalSavings,
+  onAddSavings,
   onManualAllocate,
   onAutoAllocate,
   onWithdraw,
@@ -32,11 +38,14 @@ export default function SavingsPage({
   const [editingTotal, setEditingTotal] = useState(false)
   const [totalInput, setTotalInput] = useState('')
   const [totalError, setTotalError] = useState('')
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositError, setDepositError] = useState('')
   const [allocationAmount, setAllocationAmount] = useState('')
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoalKey>('emergency')
   const [allocationError, setAllocationError] = useState('')
   const [manualOverrideEnabled, setManualOverrideEnabled] = useState(false)
   const [withdrawalAmount, setWithdrawalAmount] = useState('')
+  const [withdrawalDescription, setWithdrawalDescription] = useState('')
   const [withdrawalGoal, setWithdrawalGoal] = useState<SavingsGoalKey>('general')
   const [withdrawalError, setWithdrawalError] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
@@ -76,6 +85,18 @@ export default function SavingsPage({
     await onUpdateTotalSavings(nextTotal)
   }
 
+  async function handleAddSavings() {
+    const amount = roundMoney(Number(depositAmount))
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setDepositError('Enter a valid amount')
+      return
+    }
+
+    setDepositError('')
+    setDepositAmount('')
+    await onAddSavings(amount)
+  }
+
   async function handleManualAllocate() {
     const amount = roundMoney(Number(allocationAmount))
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -108,10 +129,16 @@ export default function SavingsPage({
       setWithdrawalError('Amount exceeds selected bucket')
       return
     }
+    const description = withdrawalDescription.trim()
+    if (!description) {
+      setWithdrawalError('Add a description')
+      return
+    }
 
     setWithdrawalError('')
     setWithdrawalAmount('')
-    await onWithdraw(withdrawalGoal, amount)
+    setWithdrawalDescription('')
+    await onWithdraw(withdrawalGoal, amount, description)
   }
 
   async function handleTransfer() {
@@ -190,6 +217,39 @@ export default function SavingsPage({
             <span className="savings-stat-value unallocated">{formatMoney(savings.unallocated)}</span>
             <span className="savings-stat-label">unallocated</span>
           </div>
+        </div>
+
+        <div className="savings-deposit-row">
+          <span className="savings-deposit-label">Add Savings</span>
+          <div className="savings-deposit-form">
+            <div className="savings-deposit-input-wrap">
+              <span className="savings-deposit-dollar">$</span>
+              <input
+                className="savings-deposit-input"
+                type="number"
+                min="0.01"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={depositAmount}
+                onChange={event => {
+                  setDepositAmount(event.target.value)
+                  setDepositError('')
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void handleAddSavings()
+                  }
+                }}
+                aria-label="Savings deposit amount"
+              />
+            </div>
+            <button className="savings-deposit-button" onClick={() => void handleAddSavings()}>
+              Add
+            </button>
+          </div>
+          {depositError && <span className="savings-input-error">{depositError}</span>}
         </div>
       </section>
 
@@ -278,7 +338,7 @@ export default function SavingsPage({
                   Available {formatMoney(withdrawalSource?.balance ?? 0)}
                 </span>
               </div>
-              <div className="override-form">
+              <div className="override-form withdraw-form">
                 <MoneyInput
                   value={withdrawalAmount}
                   onChange={value => {
@@ -291,6 +351,17 @@ export default function SavingsPage({
                   goals={savings.goals}
                   value={withdrawalGoal}
                   onChange={setWithdrawalGoal}
+                />
+                <input
+                  className="override-description-input"
+                  type="text"
+                  placeholder="Description"
+                  value={withdrawalDescription}
+                  onChange={event => {
+                    setWithdrawalDescription(event.target.value)
+                    setWithdrawalError('')
+                  }}
+                  aria-label="Withdrawal description"
                 />
                 <button className="override-action danger" onClick={() => void handleWithdraw()}>
                   Subtract
@@ -371,6 +442,42 @@ export default function SavingsPage({
           )
         })}
       </section>
+
+      <section className="savings-activity-panel">
+        <div className="savings-activity-header">
+          <span className="savings-activity-kicker">Savings Activity</span>
+          <span className="savings-activity-count">{savings.transactions.length}</span>
+        </div>
+
+        {savings.transactions.length === 0 ? (
+          <div className="savings-activity-empty">No savings activity yet.</div>
+        ) : (
+          <div className="savings-activity-list">
+            {savings.transactions.map(transaction => {
+              const goal = transaction.goalKey
+                ? savings.goals.find(item => item.key === transaction.goalKey)
+                : undefined
+              const isWithdrawal = transaction.type === 'withdrawal'
+
+              return (
+                <article className="savings-activity-item" key={transaction.id}>
+                  <span className={`savings-activity-amount ${transaction.type}`}>
+                    {isWithdrawal ? '-' : '+'}{formatMoney(transaction.amount)}
+                  </span>
+                  <div className="savings-activity-body">
+                    <span className="savings-activity-description">
+                      {transaction.description}
+                    </span>
+                    <span className="savings-activity-meta">
+                      {goal?.label ?? 'Unallocated'} - {formatActivityDate(transaction.createdAt)}
+                    </span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
     </main>
   )
 }
@@ -381,6 +488,13 @@ function formatMoney(amount: number): string {
 
 function formatPercent(value: number): string {
   return `${(value * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}% auto`
+}
+
+function formatActivityDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 interface MoneyInputProps {

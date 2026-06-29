@@ -1,9 +1,16 @@
-import type { SavingsGoal, SavingsGoalKey, SavingsState, Transaction } from '../types/budget'
+import type {
+  SavingsGoal,
+  SavingsGoalKey,
+  SavingsState,
+  SavingsTransaction,
+  Transaction,
+} from '../types/budget'
 
 export const DEFAULT_SAVINGS_GOALS: SavingsGoal[] = [
   { key: 'emergency', label: 'Emergency Savings', balance: 0 },
   { key: 'general', label: 'General Savings', balance: 0 },
   { key: 'debt', label: 'Debt Savings', balance: 0 },
+  { key: 'roth_ira', label: 'Roth IRA', balance: 0 },
   { key: 'joy_savings', label: 'Gifts & Travel', balance: 0 },
   { key: 'josh_joy_bank', label: 'Josh Joy Bank', balance: 0 },
   { key: 'wifey_joy_bank', label: 'Wifey Joy Bank', balance: 0 },
@@ -13,6 +20,7 @@ export const SAVINGS_GOAL_COLORS: Record<SavingsGoalKey, string> = {
   emergency: '#4ade80',
   general: '#60a5fa',
   debt: '#f87171',
+  roth_ira: '#2dd4bf',
   joy_savings: '#fbbf24',
   josh_joy_bank: '#c084fc',
   wifey_joy_bank: '#f472b6',
@@ -36,6 +44,7 @@ export const DEFAULT_SAVINGS_STATE: SavingsState = {
   totalSavings: 0,
   unallocated: 0,
   goals: DEFAULT_SAVINGS_GOALS,
+  transactions: [],
 }
 
 export function roundMoney(amount: number): number {
@@ -55,21 +64,40 @@ export function normalizeSavingsState(state: SavingsState): SavingsState {
     }
   })
   const unallocated = roundMoney(Math.max(0, state.unallocated))
+  const transactions = [...(state.transactions ?? [])]
+    .map(transaction => ({
+      ...transaction,
+      amount: roundMoney(transaction.amount),
+    }))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
 
   return {
     totalSavings: roundMoney(unallocated + getAllocatedSavingsTotal(goals)),
     unallocated,
     goals,
+    transactions,
   }
 }
+
+const FUTURE_SAVINGS_DESCRIPTIONS = new Set(['savings', 'roth', 'roth ira'])
 
 export function isSavingsContribution(transaction: Pick<Transaction, 'category' | 'description'>): boolean {
   const description = transaction.description.trim().toLowerCase()
 
   return (
-    (transaction.category === 'future' && description === 'savings') ||
+    (transaction.category === 'future' && FUTURE_SAVINGS_DESCRIPTIONS.has(description)) ||
     (transaction.category === 'joy' && description === 'joy bank')
   )
+}
+
+export function recordSavingsTransaction(
+  state: SavingsState,
+  transaction: SavingsTransaction
+): SavingsState {
+  return normalizeSavingsState({
+    ...state,
+    transactions: [transaction, ...(state.transactions ?? [])],
+  })
 }
 
 export function addSavingsInflow(state: SavingsState, amount: number): SavingsState {

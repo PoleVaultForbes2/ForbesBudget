@@ -28,7 +28,7 @@ This document details the architectural boundaries, tech stack, and deployment e
 ### Backend & Storage
 * **Current State:** Persistent storage is handled through Supabase using the official `@supabase/supabase-js` client.
 * **Supabase Client:** `src/lib/supabaseClient.ts` creates and exports the shared `supabase` client using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env.local`.
-* **Data Access Layer:** `src/api/budgetApi.ts` is the app's storage boundary. It fetches and mutates the `months`, `categories`, `transactions`, `savings_state`, and `savings_goals` tables, then maps database snake_case rows into the React app's camelCase state shapes.
+* **Data Access Layer:** `src/api/budgetApi.ts` is the app's storage boundary. It fetches and mutates the `months`, `categories`, `transactions`, `savings_state`, `savings_goals`, and `savings_transactions` tables, then maps database snake_case rows into the React app's camelCase state shapes.
 * **App Loading:** `App.tsx` calls `fetchAllMonths()` on startup. If no month exists yet, it creates the current month in Supabase with zero income and default categories.
 * **Category Migrations:** Existing Supabase months are not auto-mutated during app startup. When adding a new category, update constraints and insert category rows manually in Supabase.
 * **Mutation Pattern:** Budget actions use optimistic local UI updates, write through to Supabase, and roll back with a save-error toast if the database write fails.
@@ -91,10 +91,20 @@ create table savings_state (
 create table savings_goals (
   id uuid primary key default gen_random_uuid(),
   state_id text not null references savings_state(id) on delete cascade default 'shared',
-  key text not null check (key in ('emergency', 'general', 'debt', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank')),
+  key text not null check (key in ('emergency', 'general', 'debt', 'roth_ira', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank')),
   label text not null,
   balance numeric(10, 2) not null default 0,
   unique (state_id, key)
+);
+
+create table savings_transactions (
+  id uuid primary key default gen_random_uuid(),
+  state_id text not null references savings_state(id) on delete cascade default 'shared',
+  type text not null check (type in ('deposit', 'withdrawal')),
+  amount numeric(10, 2) not null,
+  description text not null,
+  goal_key text check (goal_key in ('emergency', 'general', 'debt', 'roth_ira', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank') or goal_key is null),
+  created_at timestamptz not null default now()
 );
  
 -- ─── Indexes for common queries ─────────────────────────────────
@@ -102,6 +112,7 @@ create index idx_categories_month_id on categories(month_id);
 create index idx_transactions_month_id on transactions(month_id);
 create index idx_transactions_date on transactions(date);
 create index idx_savings_goals_state_id on savings_goals(state_id);
+create index idx_savings_transactions_state_id on savings_transactions(state_id);
  
 -- ─── Enable Row Level Security but allow full public access ─────
 -- Since this is a private 2-person app using the anon key with no
@@ -112,6 +123,7 @@ alter table categories enable row level security;
 alter table transactions enable row level security;
 alter table savings_state enable row level security;
 alter table savings_goals enable row level security;
+alter table savings_transactions enable row level security;
  
 create policy "Allow all access to months" on months
   for all using (true) with check (true);
@@ -128,78 +140,21 @@ create policy "Allow all access to savings_state" on savings_state
 create policy "Allow all access to savings_goals" on savings_goals
   for all using (true) with check (true);
 
+create policy "Allow all access to savings_transactions" on savings_transactions
+  for all using (true) with check (true);
+
 ### Existing Supabase Migration Notes
 If the Supabase project was originally created with only the first three categories, update the existing check constraints before inserting Tithe rows:
 
 ```sql
-alter table categories drop constraint if exists categories_key_check;
-alter table categories
-  add constraint categories_key_check
-  check (key in ('essentials', 'future', 'joy', 'tithe'));
 
-alter table transactions drop constraint if exists transactions_category_check;
-alter table transactions
-  add constraint transactions_category_check
-  check (category in ('essentials', 'future', 'joy', 'tithe'));
-
-insert into categories (month_id, key, label, percentage, color, accent_var)
-select id, 'tithe', 'Tithe', 10, '#f87171', '--red'
-from months
-on conflict (month_id, key) do nothing;
 ```
 
 
 For the shared savings dashboard, create the savings state tables and default buckets:
 
 ```sql
-create table if not exists savings_state (
-  id text primary key default 'shared' check (id = 'shared'),
-  total_savings numeric(10, 2) not null default 0,
-  unallocated numeric(10, 2) not null default 0,
-  updated_at timestamptz not null default now()
-);
 
-create table if not exists savings_goals (
-  id uuid primary key default gen_random_uuid(),
-  state_id text not null references savings_state(id) on delete cascade default 'shared',
-  key text not null,
-  label text not null,
-  balance numeric(10, 2) not null default 0,
-  unique (state_id, key)
-);
-
-create index if not exists idx_savings_goals_state_id on savings_goals(state_id);
-
-alter table savings_state enable row level security;
-alter table savings_goals enable row level security;
-
-drop policy if exists "Allow all access to savings_state" on savings_state;
-create policy "Allow all access to savings_state" on savings_state
-  for all using (true) with check (true);
-
-drop policy if exists "Allow all access to savings_goals" on savings_goals;
-create policy "Allow all access to savings_goals" on savings_goals
-  for all using (true) with check (true);
-
-insert into savings_state (id, total_savings, unallocated)
-values ('shared', 0, 0)
-on conflict (id) do nothing;
-
-alter table savings_goals drop constraint if exists savings_goals_key_check;
-alter table savings_goals
-  add constraint savings_goals_key_check
-  check (key in ('emergency', 'general', 'debt', 'joy_savings', 'josh_joy_bank', 'wifey_joy_bank'));
-
-insert into savings_goals (state_id, key, label, balance)
-values
-  ('shared', 'emergency', 'Emergency Savings', 0),
-  ('shared', 'general', 'General Savings', 0),
-  ('shared', 'debt', 'Debt Savings', 0),
-  ('shared', 'joy_savings', 'Gifts & Travel', 0),
-  ('shared', 'josh_joy_bank', 'Josh Joy Bank', 0),
-  ('shared', 'wifey_joy_bank', 'Wifey Joy Bank', 0)
-on conflict (state_id, key) do update
-set label = excluded.label;
 ```
 
 ## Data Structures & Domains
@@ -210,7 +165,7 @@ set label = excluded.label;
 ### Category Allocations
 A rigid framework partitioning monthly income across dynamic categories:
 * **Essentials (50%):** Static overheads (Rent, Groceries, Gas, Take Out).
-* **Future (30%):** Forward wealth generation and liabilities (Retirement, Savings, Debt).
+* **Future (30%):** Forward wealth generation and liabilities (Retirement, Savings, Debt, Roth).
 * **Joy (10%):** Guilt-free lifestyle spending (Going out, Alcohol, Games, Joy Bank rollovers).
 * **Tithe (10%):** Giving allocation tracked as its own first-class budget category.
 
@@ -218,7 +173,7 @@ A rigid framework partitioning monthly income across dynamic categories:
 Joy remains a single top-level category to preserve the four-column dashboard. Inside the Joy column, the app splits the Joy budget 50/50 between Joshua and Sav and tracks each Joy transaction with `joyOwner`. Legacy Joy transactions without `joyOwner` display under Joshua by default.
 
 ### Shared Savings
-Savings is a single household pool stored in `savings_state` and split across `savings_goals`. The app maintains the invariant `totalSavings = unallocated + sum(goal balances)`. Future category transactions whose description is exactly `Savings` add to `unallocated` and the total savings pool. Joy category transactions whose description is exactly `Joy Bank` also add to `unallocated` while deducting from the Joy budget and the selected Joy owner. Auto-allocation distributes the full unallocated pool as Emergency 25%, General 25%, Debt 33.33%, and Gifts & Travel 16.67%, rounding that final auto bucket to preserve exact cents. Josh Joy Bank and Wifey Joy Bank are manual-only buckets for rolling leftover Joy funds into savings; manual withdrawals subtract from a selected goal and reduce `totalSavings`; manual transfers move funds between goals without changing `totalSavings`.
+Savings is a single household pool stored in `savings_state` and split across `savings_goals`, with manual deposit and withdrawal activity stored in `savings_transactions`. The app maintains the invariant `totalSavings = unallocated + sum(goal balances)`. Direct savings deposits add to `unallocated` and create a deposit activity entry. Future category transactions whose description is exactly `Savings`, `Roth`, or `Roth IRA` add to `unallocated` and the total savings pool. Joy category transactions whose description is exactly `Joy Bank` also add to `unallocated` while deducting from the Joy budget and the selected Joy owner. Auto-allocation distributes the full unallocated pool as Emergency 25%, General 25%, Debt 33.33%, and Gifts & Travel 16.67%, rounding that final auto bucket to preserve exact cents. Roth IRA, Josh Joy Bank, and Wifey Joy Bank are manual-only buckets. Manual withdrawals require an amount and description, subtract from a selected goal, reduce `totalSavings`, and create a withdrawal activity entry; manual transfers move funds between goals without changing `totalSavings`.
 
 ### Transactions
 Every ledger record is explicitly typed and constrained to:
@@ -243,6 +198,7 @@ These are the 4 categories with their subcategories we have so far:
 - Retirement
 - Savings
 - Debt
+- Roth
 
 ### Joy
 - Going Out

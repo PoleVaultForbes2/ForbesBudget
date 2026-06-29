@@ -6,11 +6,13 @@ import type {
   Category,
   SavingsState,
   SavingsGoal,
+  SavingsTransaction,
   DbMonthRow,
   DbCategoryRow,
   DbTransactionRow,
   DbSavingsStateRow,
   DbSavingsGoalRow,
+  DbSavingsTransactionRow,
 } from '../types/budget'
 import {
   DEFAULT_SAVINGS_GOALS,
@@ -70,9 +72,21 @@ function mapSavingsGoal(row: DbSavingsGoalRow): SavingsGoal {
   }
 }
 
+function mapSavingsTransaction(row: DbSavingsTransactionRow): SavingsTransaction {
+  return {
+    id: row.id,
+    type: row.type,
+    amount: Number(row.amount),
+    description: row.description,
+    goalKey: row.goal_key ?? undefined,
+    createdAt: row.created_at,
+  }
+}
+
 function mapSavingsState(
   row: DbSavingsStateRow,
-  goalRows: DbSavingsGoalRow[]
+  goalRows: DbSavingsGoalRow[],
+  transactionRows: DbSavingsTransactionRow[] = []
 ): SavingsState {
   return normalizeSavingsState({
     totalSavings: Number(row.total_savings),
@@ -81,6 +95,7 @@ function mapSavingsState(
       const storedGoal = goalRows.find(goal => goal.key === defaultGoal.key)
       return storedGoal ? mapSavingsGoal(storedGoal) : defaultGoal
     }),
+    transactions: transactionRows.map(mapSavingsTransaction),
   })
 }
 
@@ -101,6 +116,17 @@ function toSavingsGoalUpsert(goal: SavingsGoal) {
     key: goal.key,
     label: goal.label,
     balance: goal.balance,
+  }
+}
+
+function toSavingsTransactionInsert(transaction: Omit<SavingsTransaction, 'id'>) {
+  return {
+    state_id: SAVINGS_STATE_ID,
+    type: transaction.type,
+    amount: transaction.amount,
+    description: transaction.description,
+    goal_key: transaction.goalKey ?? null,
+    created_at: transaction.createdAt,
   }
 }
 
@@ -179,14 +205,27 @@ export async function fetchSavingsState(): Promise<SavingsState> {
   if (stateErr) throw stateErr
   if (!stateRow) return createDefaultSavingsState()
 
-  const { data: goalRows, error: goalsErr } = await supabase
-    .from('savings_goals')
-    .select('*')
-    .eq('state_id', SAVINGS_STATE_ID)
+  const [goalsRes, transactionsRes] = await Promise.all([
+    supabase
+      .from('savings_goals')
+      .select('*')
+      .eq('state_id', SAVINGS_STATE_ID),
+    supabase
+      .from('savings_transactions')
+      .select('*')
+      .eq('state_id', SAVINGS_STATE_ID)
+      .order('created_at', { ascending: false }),
+  ])
 
-  if (goalsErr) throw goalsErr
+  if (goalsRes.error) throw goalsRes.error
+  if (transactionsRes.error && !isMissingTableError(transactionsRes.error)) {
+    throw transactionsRes.error
+  }
 
-  const existingGoals = (goalRows ?? []) as DbSavingsGoalRow[]
+  const existingGoals = (goalsRes.data ?? []) as DbSavingsGoalRow[]
+  const savingsTransactions = transactionsRes.error
+    ? []
+    : ((transactionsRes.data ?? []) as DbSavingsTransactionRow[])
   const missingGoals = DEFAULT_SAVINGS_GOALS.filter(
     defaultGoal => !existingGoals.some(goal => goal.key === defaultGoal.key)
   )
@@ -210,7 +249,11 @@ export async function fetchSavingsState(): Promise<SavingsState> {
     balance: goal.balance,
   }))
 
-  return mapSavingsState(stateRow as DbSavingsStateRow, [...existingGoals, ...defaultGoalRows])
+  return mapSavingsState(
+    stateRow as DbSavingsStateRow,
+    [...existingGoals, ...defaultGoalRows],
+    savingsTransactions
+  )
 }
 
 export async function updateSavingsState(savingsState: SavingsState): Promise<void> {
@@ -232,6 +275,28 @@ export async function updateSavingsState(savingsState: SavingsState): Promise<vo
     .upsert(normalized.goals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
 
   if (goalsErr) throw goalsErr
+}
+
+export async function insertSavingsTransaction(
+  transaction: Omit<SavingsTransaction, 'id'>
+): Promise<SavingsTransaction> {
+  const { data, error } = await supabase
+    .from('savings_transactions')
+    .insert(toSavingsTransactionInsert(transaction))
+    .select()
+    .single()
+
+  if (error) throw error
+  return mapSavingsTransaction(data as DbSavingsTransactionRow)
+}
+
+export async function deleteSavingsTransaction(transactionId: string): Promise<void> {
+  const { error } = await supabase
+    .from('savings_transactions')
+    .delete()
+    .eq('id', transactionId)
+
+  if (error) throw error
 }
 
 // ─── Months ──────────────────────────────────────────────────────

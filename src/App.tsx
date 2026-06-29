@@ -8,6 +8,7 @@ import type {
   Category,
   SavingsState,
   SavingsGoalKey,
+  SavingsTransaction,
 } from './types/budget'
 import BudgetColumn from './components/BudgetColumn'
 import TransactionLog from './components/TransactionLog'
@@ -22,6 +23,7 @@ import {
   isSavingsContribution,
   manuallyAllocateSavings,
   normalizeSavingsState,
+  recordSavingsTransaction,
   removeSavingsInflow,
   setSavingsTotal,
   transferSavings,
@@ -41,7 +43,7 @@ const DEFAULT_CATEGORIES: CategoryConfig[] = [
 
 const CATEGORY_PRESETS: Record<string, string[]> = {
   essentials: ['Rent', 'Groceries', 'Gas', 'Take Out', 'Subs'],
-  future: ['Retirement', 'Savings', 'Debt'],
+  future: ['Retirement', 'Savings', 'Debt', 'Roth'],
   joy: ['Going out', 'Alcohol', 'Games', 'Joy Bank'],
   tithe: ['Tithe'],
 }
@@ -202,6 +204,61 @@ export default function App() {
     }
   }
 
+  async function persistSavingsChangeWithActivity(
+    previousSavings: SavingsState,
+    nextSavings: SavingsState,
+    activity: SavingsTransaction,
+    context: string
+  ) {
+    setSavings(nextSavings)
+    try {
+      await api.updateSavingsState(nextSavings)
+      const savedActivity = await api.insertSavingsTransaction({
+        type: activity.type,
+        amount: activity.amount,
+        description: activity.description,
+        goalKey: activity.goalKey,
+        createdAt: activity.createdAt,
+      })
+
+      setSavings(currentSavings => (
+        currentSavings
+          ? normalizeSavingsState({
+              ...currentSavings,
+              transactions: currentSavings.transactions.map(transaction => (
+                transaction.id === activity.id ? savedActivity : transaction
+              )),
+            })
+          : currentSavings
+      ))
+    } catch (err) {
+      console.error(err)
+      try {
+        await api.updateSavingsState(previousSavings)
+      } catch (rollbackErr) {
+        console.error(rollbackErr)
+      }
+      setSavings(previousSavings)
+      flashSaveError(context)
+    }
+  }
+
+  function buildSavingsActivity(
+    type: SavingsTransaction['type'],
+    amount: number,
+    description: string,
+    goalKey?: SavingsGoalKey
+  ): SavingsTransaction {
+    return {
+      id: generateTempId(),
+      type,
+      amount,
+      description,
+      goalKey,
+      createdAt: new Date().toISOString(),
+    }
+  }
+
   function buildSavingsInflowState(
     currentSavings: SavingsState | null,
     transaction: Omit<Transaction, 'id'> | Transaction
@@ -353,6 +410,17 @@ export default function App() {
     await persistSavingsChange(savings, nextSavings, 'savings total')
   }
 
+  async function addDirectSavings(amount: number) {
+    if (!savings) return
+    const activity = buildSavingsActivity('deposit', amount, 'Manual savings add')
+    const nextSavings = recordSavingsTransaction(
+      addSavingsInflow(savings, amount),
+      activity
+    )
+
+    await persistSavingsChangeWithActivity(savings, nextSavings, activity, 'savings deposit')
+  }
+
   async function allocateSavingsManually(goalKey: SavingsGoalKey, amount: number) {
     if (!savings) return
     const nextSavings = manuallyAllocateSavings(savings, goalKey, amount)
@@ -372,15 +440,22 @@ export default function App() {
     await persistSavingsChange(savings, nextSavings, 'savings allocation')
   }
 
-  async function subtractFromSavingsGoal(goalKey: SavingsGoalKey, amount: number) {
+  async function subtractFromSavingsGoal(
+    goalKey: SavingsGoalKey,
+    amount: number,
+    description: string
+  ) {
     if (!savings) return
-    const nextSavings = withdrawSavings(savings, goalKey, amount)
-    if (!nextSavings) {
+    const nextBalances = withdrawSavings(savings, goalKey, amount)
+    if (!nextBalances) {
       flashSaveError('savings withdrawal')
       return
     }
 
-    await persistSavingsChange(savings, nextSavings, 'savings withdrawal')
+    const activity = buildSavingsActivity('withdrawal', amount, description, goalKey)
+    const nextSavings = recordSavingsTransaction(nextBalances, activity)
+
+    await persistSavingsChangeWithActivity(savings, nextSavings, activity, 'savings withdrawal')
   }
 
   async function moveSavingsBetweenGoals(
@@ -490,6 +565,7 @@ export default function App() {
         <SavingsPage
           savings={savings}
           onUpdateTotalSavings={updateTotalSavings}
+          onAddSavings={addDirectSavings}
           onManualAllocate={allocateSavingsManually}
           onAutoAllocate={autoAllocateUnallocatedSavings}
           onWithdraw={subtractFromSavingsGoal}
