@@ -205,7 +205,7 @@ set label = excluded.label;
 ## Data Structures & Domains
 
 ### Monthly Income
-`months.monthly_income` stores the active month's cumulative income budget. The UI supports adding paycheck amounts as they arrive while preserving an edit-total control for corrections. New months start with zero income and inherit category percentages.
+`months.monthly_income` stores the active month's cumulative income budget. The UI supports adding paycheck amounts as they arrive while preserving an edit-total control for corrections. New months start with zero income and inherit category percentages. The new-month setup banner appears when the latest stored month is already past or when fewer than 7 days remain in the latest stored month.
 
 ### Category Allocations
 A rigid framework partitioning monthly income across dynamic categories:

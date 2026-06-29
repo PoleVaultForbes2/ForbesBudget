@@ -11,7 +11,7 @@ export default function NewMonthBanner({ newMonthLabel, onStartNewMonth }: Props
       <div className="nmb-text">
         <span className="nmb-icon">📅</span>
         <div>
-          <p className="nmb-title">It's a new month!</p>
+          <p className="nmb-title">Next month is ready</p>
           <p className="nmb-sub">Ready to start tracking <strong>{newMonthLabel}</strong>? Your previous month will be saved and locked.</p>
         </div>
       </div>

@@ -47,6 +47,8 @@ const CATEGORY_PRESETS: Record<string, string[]> = {
 }
 
 const STARTING_MONTHLY_INCOME = 0
+const NEW_MONTH_SETUP_DAYS_LEFT = 7
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -68,6 +70,12 @@ function prevMonthKey(key: string): string {
 function nextMonthKey(key: string): string {
   const [y, m] = key.split('-').map(Number)
   return toMonthKey(new Date(y, m, 1))
+}
+
+function daysLeftInMonth(date: Date): number {
+  const today = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  return Math.round((endOfMonth.getTime() - today.getTime()) / MS_PER_DAY)
 }
 
 function generateTempId() {
@@ -144,16 +152,21 @@ export default function App() {
 
   // ── Derived values ──
   const activeMonth = months.find(m => m.monthKey === activeMonthKey)
-  const realMonthKey = toMonthKey(new Date())
+  const today = new Date()
+  const realMonthKey = toMonthKey(today)
   const isReadOnly = activeMonth?.closedOut ?? false
 
   const sortedKeys = months.map(m => m.monthKey).sort()
   const latestStoredKey = sortedKeys[sortedKeys.length - 1]
+  const isNewMonthSetupWindow =
+    latestStoredKey === realMonthKey &&
+    daysLeftInMonth(today) < NEW_MONTH_SETUP_DAYS_LEFT
 
   const showNewMonthBanner =
     !isReadOnly &&
     activeMonthKey === latestStoredKey &&
-    latestStoredKey < realMonthKey
+    latestStoredKey <= realMonthKey &&
+    (latestStoredKey < realMonthKey || isNewMonthSetupWindow)
 
   const canGoPrev = sortedKeys.length > 0 && sortedKeys[0] < activeMonthKey
   const canGoNext = activeMonthKey < latestStoredKey
