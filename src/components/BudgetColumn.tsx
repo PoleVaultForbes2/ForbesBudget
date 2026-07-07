@@ -10,12 +10,25 @@ interface Props {
   transactions: Transaction[]
   presets: string[]
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void
+  onAddCategoryFunds: (category: CategoryConfig['key'], amount: number) => void
   readOnly? : boolean
 }
 
-export default function BudgetColumn({ config, budget, transactions, presets, onAddTransaction, readOnly = false }: Props) {
+export default function BudgetColumn({
+  config,
+  budget,
+  transactions,
+  presets,
+  onAddTransaction,
+  onAddCategoryFunds,
+  readOnly = false,
+}: Props) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [addingFunds, setAddingFunds] = useState(false)
+  const [fundsInput, setFundsInput] = useState('')
+  const [fundsError, setFundsError] = useState('')
 
+  const extraFunds = config.extraFunds ?? 0
   const spent = transactions.reduce((sum, t) => sum + t.amount, 0)
   const remaining = budget - spent
   const pct = budget > 0 ? Math.min(spent / budget, 1) : spent > 0 ? 1 : 0
@@ -43,6 +56,19 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
       })
     : []
 
+  function commitCategoryFunds() {
+    const amount = Number(fundsInput)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFundsError('Enter a valid amount')
+      return
+    }
+
+    onAddCategoryFunds(config.key, Math.round(amount * 100) / 100)
+    setFundsInput('')
+    setFundsError('')
+    setAddingFunds(false)
+  }
+
   // SVG ring math
   const R = 36
   const CIRC = 2 * Math.PI * R
@@ -66,12 +92,15 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
         <div className="col-meta">
           <h2 className="col-title">{config.label}</h2>
           <span className="col-alloc">{config.percentage}% of income</span>
+          {extraFunds > 0 && (
+            <span className="col-boost">+${formatMoney(extraFunds)} added</span>
+          )}
         </div>
       </div>
  
       <div className="col-amounts">
         <div className="amount-block">
-          <span className="amount-value">${budget.toLocaleString()}</span>
+          <span className="amount-value">${formatMoney(budget)}</span>
           <span className="amount-label">budget</span>
         </div>
         <div className="amount-block">
@@ -149,10 +178,64 @@ export default function BudgetColumn({ config, budget, transactions, presets, on
         )}
       </div>
  
+      {!readOnly && addingFunds && (
+        <div className="add-funds-form">
+          <div className="add-funds-input-wrap">
+            <span className="add-funds-dollar">$</span>
+            <input
+              className="add-funds-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={fundsInput}
+              onChange={event => {
+                setFundsInput(event.target.value)
+                setFundsError('')
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  commitCategoryFunds()
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setAddingFunds(false)
+                  setFundsError('')
+                  setFundsInput('')
+                }
+              }}
+              aria-label={`Add money to ${config.label}`}
+              autoFocus
+            />
+          </div>
+          <button className="add-funds-save" onClick={commitCategoryFunds}>
+            Add
+          </button>
+          <button
+            className="add-funds-cancel"
+            onClick={() => {
+              setAddingFunds(false)
+              setFundsError('')
+              setFundsInput('')
+            }}
+          >
+            Cancel
+          </button>
+          {fundsError && <span className="add-funds-error">{fundsError}</span>}
+        </div>
+      )}
+
       {!readOnly && (
-        <button className="add-btn" onClick={() => setModalOpen(true)}>
-          + Add Expense
-        </button>
+        <div className="column-actions">
+          <button className="add-btn" onClick={() => setModalOpen(true)}>
+            + Add Expense
+          </button>
+          <button className="boost-btn" onClick={() => setAddingFunds(open => !open)}>
+            + Add Money
+          </button>
+        </div>
       )}
  
       {!readOnly && modalOpen && (

@@ -61,6 +61,7 @@ function mapCategory(row: DbCategoryRow): CategoryConfig {
     percentage: Number(row.percentage),
     color: row.color,
     accentVar: row.accent_var,
+    extraFunds: Number(row.extra_funds ?? 0),
   }
 }
 
@@ -107,6 +108,7 @@ function toCategoryInsert(monthId: string, category: CategoryConfig) {
     percentage: category.percentage,
     color: category.color,
     accent_var: category.accentVar,
+    extra_funds: category.extraFunds ?? 0,
   }
 }
 
@@ -354,6 +356,20 @@ export async function updateCategoryPercentage(
   const { error } = await supabase
     .from('categories')
     .update({ percentage })
+    .eq('month_id', monthId)
+    .eq('key', key)
+
+  if (error) throw error
+}
+
+export async function updateCategoryExtraFunds(
+  monthId: string,
+  key: Category,
+  extraFunds: number
+): Promise<void> {
+  const { error } = await supabase
+    .from('categories')
+    .update({ extra_funds: extraFunds })
     .eq('month_id', monthId)
     .eq('key', key)
 

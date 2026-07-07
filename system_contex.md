@@ -59,6 +59,7 @@ create table categories (
   key text not null check (key in ('essentials', 'future', 'joy', 'tithe')),
   label text not null,
   percentage numeric(5, 2) not null,
+  extra_funds numeric(10, 2) not null default 0,
   color text not null,
   accent_var text not null,
  
@@ -147,7 +148,13 @@ create policy "Allow all access to savings_transactions" on savings_transactions
 If the Supabase project was originally created with only the first three categories, update the existing check constraints before inserting Tithe rows:
 
 ```sql
+alter table categories drop constraint if exists categories_key_check;
+alter table categories
+  add constraint categories_key_check
+  check (key in ('essentials', 'future', 'joy', 'tithe'));
 
+alter table categories
+  add column if not exists extra_funds numeric(10, 2) not null default 0;
 ```
 
 
@@ -168,6 +175,7 @@ A rigid framework partitioning monthly income across dynamic categories:
 * **Future (30%):** Forward wealth generation and liabilities (Retirement, Savings, Debt, Roth).
 * **Joy (10%):** Guilt-free lifestyle spending (Going out, Alcohol, Games, Joy Bank rollovers).
 * **Tithe (10%):** Giving allocation tracked as its own first-class budget category.
+Each category can also hold `extraFunds`, persisted as `categories.extra_funds`, for one-off money like gifts. Extra funds increase that category's spendable budget without changing `monthly_income` or the percentage allocation, and spending consumes extra funds before reducing the dashboard's monthly remaining amount.
 
 ### Joy Split
 Joy remains a single top-level category to preserve the four-column dashboard. Inside the Joy column, the app splits the Joy budget 50/50 between Joshua and Sav and tracks each Joy transaction with `joyOwner`. Legacy Joy transactions without `joyOwner` display under Joshua by default.

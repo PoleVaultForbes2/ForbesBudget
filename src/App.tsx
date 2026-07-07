@@ -35,10 +35,10 @@ import './App.css'
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORIES: CategoryConfig[] = [
-  { key: 'essentials', label: 'Essentials', percentage: 50, color: '#4ade80', accentVar: '--green' },
-  { key: 'future',     label: 'Future',     percentage: 30, color: '#60a5fa', accentVar: '--blue'  },
-  { key: 'joy',        label: 'Joy',        percentage: 10, color: '#fbbf24', accentVar: '--amber' },
-  { key: 'tithe',      label: 'Tithe',      percentage: 10, color: '#f87171', accentVar: '--red'   },
+  { key: 'essentials', label: 'Essentials', percentage: 50, color: '#4ade80', accentVar: '--green', extraFunds: 0 },
+  { key: 'future',     label: 'Future',     percentage: 30, color: '#60a5fa', accentVar: '--blue',  extraFunds: 0 },
+  { key: 'joy',        label: 'Joy',        percentage: 10, color: '#fbbf24', accentVar: '--amber', extraFunds: 0 },
+  { key: 'tithe',      label: 'Tithe',      percentage: 10, color: '#f87171', accentVar: '--red',   extraFunds: 0 },
 ]
 
 const CATEGORY_PRESETS: Record<string, string[]> = {
@@ -91,6 +91,16 @@ function orderCategories(categories: CategoryConfig[]): CategoryConfig[] {
     (defaultOrder.get(a.key) ?? Number.MAX_SAFE_INTEGER) -
     (defaultOrder.get(b.key) ?? Number.MAX_SAFE_INTEGER)
   ))
+}
+
+function getCategorySpent(transactions: Transaction[], category: Category): number {
+  return transactions
+    .filter(transaction => transaction.category === category)
+    .reduce((sum, transaction) => sum + transaction.amount, 0)
+}
+
+function getMonthlyBudgetSpend(category: CategoryConfig, transactions: Transaction[]): number {
+  return Math.max(0, getCategorySpent(transactions, category.key) - (category.extraFunds ?? 0))
 }
 
 // ─── App ────────────────────────────────────────────────────────────────────
@@ -173,7 +183,10 @@ export default function App() {
   const canGoPrev = sortedKeys.length > 0 && sortedKeys[0] < activeMonthKey
   const canGoNext = activeMonthKey < latestStoredKey
 
-  const totalSpent = activeMonth?.transactions.reduce((s, t) => s + t.amount, 0) ?? 0
+  const totalSpent = activeMonth?.categories.reduce(
+    (sum, category) => sum + getMonthlyBudgetSpend(category, activeMonth.transactions),
+    0
+  ) ?? 0
   const totalBudget = activeMonth?.monthlyIncome ?? 0
   const totalRemaining = totalBudget - totalSpent
 
@@ -495,6 +508,35 @@ export default function App() {
     }
   }
 
+  async function addCategoryFunds(key: Category, amount: number) {
+    if (!activeMonth) return
+    const category = activeMonth.categories.find(c => c.key === key)
+    if (!category) return
+
+    const previousExtraFunds = category.extraFunds ?? 0
+    const nextExtraFunds = Math.round((previousExtraFunds + amount) * 100) / 100
+
+    patchMonth(activeMonth.id, m => ({
+      ...m,
+      categories: m.categories.map(cat => (
+        cat.key === key ? { ...cat, extraFunds: nextExtraFunds } : cat
+      )),
+    }))
+
+    try {
+      await api.updateCategoryExtraFunds(activeMonth.id, key, nextExtraFunds)
+    } catch (err) {
+      console.error(err)
+      patchMonth(activeMonth.id, m => ({
+        ...m,
+        categories: m.categories.map(cat => (
+          cat.key === key ? { ...cat, extraFunds: previousExtraFunds } : cat
+        )),
+      }))
+      flashSaveError('category funds')
+    }
+  }
+
   async function startNewMonth() {
     const lastMonth = months.find(m => m.monthKey === latestStoredKey)
     if (!lastMonth) return
@@ -504,7 +546,11 @@ export default function App() {
       // Close out the old month in the DB
       await api.setMonthClosedOut(lastMonth.id, true)
       // Create the new month in the DB, carrying categories forward and resetting income for new paychecks.
-      const newMonth = await api.createMonth(newKey, STARTING_MONTHLY_INCOME, lastMonth.categories)
+      const newMonthCategories = lastMonth.categories.map(category => ({
+        ...category,
+        extraFunds: 0,
+      }))
+      const newMonth = await api.createMonth(newKey, STARTING_MONTHLY_INCOME, newMonthCategories)
 
       setMonths(prev => [
         ...prev.map(m => (m.id === lastMonth.id ? { ...m, closedOut: true } : m)),
@@ -685,9 +731,7 @@ export default function App() {
             {/* Global segmented progress bar */}
             <div className="global-bar-track">
               {activeMonth.categories.map(cat => {
-                const catSpent = activeMonth.transactions
-                  .filter(t => t.category === cat.key)
-                  .reduce((s, t) => s + t.amount, 0)
+                const catSpent = getMonthlyBudgetSpend(cat, activeMonth.transactions)
                 const pct = totalBudget > 0 ? Math.min((catSpent / totalBudget) * 100, 100) : 0
                 return (
                   <div
@@ -712,7 +756,8 @@ export default function App() {
           {/* ── Budget columns ── */}
           <section className="columns">
             {activeMonth.categories.map(cat => {
-              const budget = Math.round(activeMonth.monthlyIncome * cat.percentage / 100)
+              const baseBudget = Math.round(activeMonth.monthlyIncome * cat.percentage / 100)
+              const budget = baseBudget + (cat.extraFunds ?? 0)
               const catTransactions = activeMonth.transactions.filter(t => t.category === cat.key)
               return (
                 <BudgetColumn
@@ -721,6 +766,7 @@ export default function App() {
                   budget={budget}
                   transactions={catTransactions}
                   onAddTransaction={addTransaction}
+                  onAddCategoryFunds={addCategoryFunds}
                   presets={CATEGORY_PRESETS[cat.key] || []}
                   readOnly={isReadOnly}
                 />

@@ -26,6 +26,7 @@ export interface CategoryConfig {
   percentage: number
   color: string
   accentVar: string
+  extraFunds: number
 }
 
 export interface SavingsGoal {
@@ -84,6 +85,7 @@ export interface DbCategoryRow {
   percentage: number
   color: string
   accent_var: string
+  extra_funds?: number | null
 }
 
 export interface DbTransactionRow {
