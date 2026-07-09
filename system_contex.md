@@ -148,13 +148,7 @@ create policy "Allow all access to savings_transactions" on savings_transactions
 If the Supabase project was originally created with only the first three categories, update the existing check constraints before inserting Tithe rows:
 
 ```sql
-alter table categories drop constraint if exists categories_key_check;
-alter table categories
-  add constraint categories_key_check
-  check (key in ('essentials', 'future', 'joy', 'tithe'));
 
-alter table categories
-  add column if not exists extra_funds numeric(10, 2) not null default 0;
 ```
 
 
