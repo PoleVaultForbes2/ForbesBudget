@@ -26,7 +26,7 @@ export interface CategoryConfig {
   percentage: number
   color: string
   accentVar: string
-  extraFunds: number
+  allocatedFunds: number
 }
 
 export interface SavingsGoal {

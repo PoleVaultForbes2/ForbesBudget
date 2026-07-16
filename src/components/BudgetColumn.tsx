@@ -10,7 +10,6 @@ interface Props {
   transactions: Transaction[]
   presets: string[]
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void
-  onAddCategoryFunds: (category: CategoryConfig['key'], amount: number) => void
   readOnly? : boolean
 }
 
@@ -20,15 +19,10 @@ export default function BudgetColumn({
   transactions,
   presets,
   onAddTransaction,
-  onAddCategoryFunds,
   readOnly = false,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
-  const [addingFunds, setAddingFunds] = useState(false)
-  const [fundsInput, setFundsInput] = useState('')
-  const [fundsError, setFundsError] = useState('')
 
-  const extraFunds = config.extraFunds ?? 0
   const spent = transactions.reduce((sum, t) => sum + t.amount, 0)
   const remaining = budget - spent
   const pct = budget > 0 ? Math.min(spent / budget, 1) : spent > 0 ? 1 : 0
@@ -56,19 +50,6 @@ export default function BudgetColumn({
       })
     : []
 
-  function commitCategoryFunds() {
-    const amount = Number(fundsInput)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setFundsError('Enter a valid amount')
-      return
-    }
-
-    onAddCategoryFunds(config.key, Math.round(amount * 100) / 100)
-    setFundsInput('')
-    setFundsError('')
-    setAddingFunds(false)
-  }
-
   // SVG ring math
   const R = 36
   const CIRC = 2 * Math.PI * R
@@ -91,10 +72,7 @@ export default function BudgetColumn({
  
         <div className="col-meta">
           <h2 className="col-title">{config.label}</h2>
-          <span className="col-alloc">{config.percentage}% of income</span>
-          {extraFunds > 0 && (
-            <span className="col-boost">+${formatMoney(extraFunds)} added</span>
-          )}
+          <span className="col-alloc">{config.percentage}% auto target</span>
         </div>
       </div>
  
@@ -178,64 +156,10 @@ export default function BudgetColumn({
         )}
       </div>
  
-      {!readOnly && addingFunds && (
-        <div className="add-funds-form">
-          <div className="add-funds-input-wrap">
-            <span className="add-funds-dollar">$</span>
-            <input
-              className="add-funds-input"
-              type="number"
-              min="0.01"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={fundsInput}
-              onChange={event => {
-                setFundsInput(event.target.value)
-                setFundsError('')
-              }}
-              onKeyDown={event => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  commitCategoryFunds()
-                }
-                if (event.key === 'Escape') {
-                  event.preventDefault()
-                  setAddingFunds(false)
-                  setFundsError('')
-                  setFundsInput('')
-                }
-              }}
-              aria-label={`Add money to ${config.label}`}
-              autoFocus
-            />
-          </div>
-          <button className="add-funds-save" onClick={commitCategoryFunds}>
-            Add
-          </button>
-          <button
-            className="add-funds-cancel"
-            onClick={() => {
-              setAddingFunds(false)
-              setFundsError('')
-              setFundsInput('')
-            }}
-          >
-            Cancel
-          </button>
-          {fundsError && <span className="add-funds-error">{fundsError}</span>}
-        </div>
-      )}
-
       {!readOnly && (
-        <div className="column-actions">
-          <button className="add-btn" onClick={() => setModalOpen(true)}>
-            + Add Expense
-          </button>
-          <button className="boost-btn" onClick={() => setAddingFunds(open => !open)}>
-            + Add Money
-          </button>
-        </div>
+        <button className="add-btn" onClick={() => setModalOpen(true)}>
+          + Add Expense
+        </button>
       )}
  
       {!readOnly && modalOpen && (

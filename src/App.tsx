@@ -25,6 +25,7 @@ import {
   normalizeSavingsState,
   recordSavingsTransaction,
   removeSavingsInflow,
+  roundMoney,
   setSavingsTotal,
   transferSavings,
   withdrawSavings,
@@ -35,10 +36,10 @@ import './App.css'
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORIES: CategoryConfig[] = [
-  { key: 'essentials', label: 'Essentials', percentage: 50, color: '#4ade80', accentVar: '--green', extraFunds: 0 },
-  { key: 'future',     label: 'Future',     percentage: 30, color: '#60a5fa', accentVar: '--blue',  extraFunds: 0 },
-  { key: 'joy',        label: 'Joy',        percentage: 10, color: '#fbbf24', accentVar: '--amber', extraFunds: 0 },
-  { key: 'tithe',      label: 'Tithe',      percentage: 10, color: '#f87171', accentVar: '--red',   extraFunds: 0 },
+  { key: 'essentials', label: 'Essentials', percentage: 50, color: '#4ade80', accentVar: '--green', allocatedFunds: 0 },
+  { key: 'future',     label: 'Future',     percentage: 30, color: '#60a5fa', accentVar: '--blue',  allocatedFunds: 0 },
+  { key: 'joy',        label: 'Joy',        percentage: 10, color: '#fbbf24', accentVar: '--amber', allocatedFunds: 0 },
+  { key: 'tithe',      label: 'Tithe',      percentage: 10, color: '#f87171', accentVar: '--red',   allocatedFunds: 0 },
 ]
 
 const CATEGORY_PRESETS: Record<string, string[]> = {
@@ -99,8 +100,8 @@ function getCategorySpent(transactions: Transaction[], category: Category): numb
     .reduce((sum, transaction) => sum + transaction.amount, 0)
 }
 
-function getMonthlyBudgetSpend(category: CategoryConfig, transactions: Transaction[]): number {
-  return Math.max(0, getCategorySpent(transactions, category.key) - (category.extraFunds ?? 0))
+function getAllocatedIncomeTotal(categories: CategoryConfig[]): number {
+  return roundMoney(categories.reduce((sum, category) => sum + (category.allocatedFunds ?? 0), 0))
 }
 
 // ─── App ────────────────────────────────────────────────────────────────────
@@ -120,6 +121,9 @@ export default function App() {
   const [page, setPage] = useState<Page>('budget')
   const [incomeMode, setIncomeMode] = useState<IncomeMode>('idle')
   const [incomeInput, setIncomeInput] = useState('')
+  const [allocationAmount, setAllocationAmount] = useState('')
+  const [selectedAllocationCategory, setSelectedAllocationCategory] = useState<Category>('essentials')
+  const [allocationError, setAllocationError] = useState('')
   const [showCategorySettings, setShowCategorySettings] = useState(false)
 
   // ── Initial fetch from Supabase ──
@@ -183,11 +187,11 @@ export default function App() {
   const canGoPrev = sortedKeys.length > 0 && sortedKeys[0] < activeMonthKey
   const canGoNext = activeMonthKey < latestStoredKey
 
-  const totalSpent = activeMonth?.categories.reduce(
-    (sum, category) => sum + getMonthlyBudgetSpend(category, activeMonth.transactions),
-    0
-  ) ?? 0
+  const totalSpent = activeMonth?.transactions.reduce((sum, transaction) => sum + transaction.amount, 0) ?? 0
   const totalBudget = activeMonth?.monthlyIncome ?? 0
+  const allocatedIncomeTotal = activeMonth ? getAllocatedIncomeTotal(activeMonth.categories) : 0
+  const unallocatedIncome = roundMoney(Math.max(0, totalBudget - allocatedIncomeTotal))
+  const hasUnallocatedIncome = unallocatedIncome > 0
   const totalRemaining = totalBudget - totalSpent
 
   const newMonthLabel = monthKeyToLabel(nextMonthKey(latestStoredKey || realMonthKey))
@@ -508,32 +512,109 @@ export default function App() {
     }
   }
 
-  async function addCategoryFunds(key: Category, amount: number) {
+  async function allocateIncomeManually() {
     if (!activeMonth) return
+    const amount = parsePositiveMoney(allocationAmount)
+    if (amount === null) {
+      setAllocationError('Enter a valid amount')
+      return
+    }
+    if (amount > unallocatedIncome) {
+      setAllocationError('Amount exceeds unallocated income')
+      return
+    }
+
+    const key = selectedAllocationCategory
     const category = activeMonth.categories.find(c => c.key === key)
     if (!category) return
 
-    const previousExtraFunds = category.extraFunds ?? 0
-    const nextExtraFunds = Math.round((previousExtraFunds + amount) * 100) / 100
+    const previousAllocatedFunds = category.allocatedFunds ?? 0
+    const nextAllocatedFunds = roundMoney(previousAllocatedFunds + amount)
+    setAllocationError('')
+    setAllocationAmount('')
 
     patchMonth(activeMonth.id, m => ({
       ...m,
       categories: m.categories.map(cat => (
-        cat.key === key ? { ...cat, extraFunds: nextExtraFunds } : cat
+        cat.key === key ? { ...cat, allocatedFunds: nextAllocatedFunds } : cat
       )),
     }))
 
     try {
-      await api.updateCategoryExtraFunds(activeMonth.id, key, nextExtraFunds)
+      await api.updateCategoryAllocatedFunds(activeMonth.id, key, nextAllocatedFunds)
     } catch (err) {
       console.error(err)
       patchMonth(activeMonth.id, m => ({
         ...m,
         categories: m.categories.map(cat => (
-          cat.key === key ? { ...cat, extraFunds: previousExtraFunds } : cat
+          cat.key === key ? { ...cat, allocatedFunds: previousAllocatedFunds } : cat
         )),
       }))
-      flashSaveError('category funds')
+      flashSaveError('income allocation')
+    }
+  }
+
+  async function autoAllocateUnallocatedIncome() {
+    if (!activeMonth || unallocatedIncome <= 0) return
+
+    const pool = roundMoney(unallocatedIncome)
+    const previousCategories = activeMonth.categories
+    const totalWeight = previousCategories.reduce((sum, category) => sum + category.percentage, 0)
+    if (totalWeight <= 0) {
+      setAllocationError('Set category percentages before auto allocating')
+      return
+    }
+
+    let allocatedSoFar = 0
+    const finalIndex = previousCategories.length - 1
+    const nextCategories = previousCategories.map((category, index) => {
+      const allocation = index === finalIndex
+        ? roundMoney(pool - allocatedSoFar)
+        : roundMoney(pool * (category.percentage / totalWeight))
+      allocatedSoFar = roundMoney(allocatedSoFar + allocation)
+
+      return {
+        ...category,
+        allocatedFunds: roundMoney((category.allocatedFunds ?? 0) + allocation),
+      }
+    })
+
+    setAllocationError('')
+    patchMonth(activeMonth.id, m => ({
+      ...m,
+      categories: nextCategories,
+    }))
+
+    const persistedKeys: Category[] = []
+    try {
+      for (const category of nextCategories) {
+        const previousCategory = previousCategories.find(cat => cat.key === category.key)
+        const nextAllocatedFunds = category.allocatedFunds ?? 0
+        if ((previousCategory?.allocatedFunds ?? 0) === nextAllocatedFunds) continue
+
+        await api.updateCategoryAllocatedFunds(activeMonth.id, category.key, nextAllocatedFunds)
+        persistedKeys.push(category.key)
+      }
+    } catch (err) {
+      console.error(err)
+      for (const key of persistedKeys) {
+        const previousCategory = previousCategories.find(category => category.key === key)
+        if (!previousCategory) continue
+        try {
+          await api.updateCategoryAllocatedFunds(
+            activeMonth.id,
+            key,
+            previousCategory.allocatedFunds ?? 0
+          )
+        } catch (rollbackErr) {
+          console.error(rollbackErr)
+        }
+      }
+      patchMonth(activeMonth.id, m => ({
+        ...m,
+        categories: previousCategories,
+      }))
+      flashSaveError('income allocation')
     }
   }
 
@@ -548,7 +629,7 @@ export default function App() {
       // Create the new month in the DB, carrying categories forward and resetting income for new paychecks.
       const newMonthCategories = lastMonth.categories.map(category => ({
         ...category,
-        extraFunds: 0,
+        allocatedFunds: 0,
       }))
       const newMonth = await api.createMonth(newKey, STARTING_MONTHLY_INCOME, newMonthCategories)
 
@@ -731,7 +812,7 @@ export default function App() {
             {/* Global segmented progress bar */}
             <div className="global-bar-track">
               {activeMonth.categories.map(cat => {
-                const catSpent = getMonthlyBudgetSpend(cat, activeMonth.transactions)
+                const catSpent = getCategorySpent(activeMonth.transactions, cat.key)
                 const pct = totalBudget > 0 ? Math.min((catSpent / totalBudget) * 100, 100) : 0
                 return (
                   <div
@@ -754,10 +835,83 @@ export default function App() {
           </section>
 
           {/* ── Budget columns ── */}
+          <section className="budget-allocation-panel">
+            <div className="budget-allocation-summary">
+              <span className="budget-allocation-label">Unallocated Income</span>
+              <span className="budget-allocation-value">
+                ${unallocatedIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="budget-allocation-subtle">
+                ${allocatedIncomeTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} allocated
+              </span>
+            </div>
+
+            {!isReadOnly && (
+              <div className="budget-allocation-controls">
+                <div className="budget-allocation-form">
+                  <div className="budget-allocation-input-wrap">
+                    <span className="budget-allocation-dollar">$</span>
+                    <input
+                      className="budget-allocation-input"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={allocationAmount}
+                      onChange={event => {
+                        setAllocationAmount(event.target.value)
+                        setAllocationError('')
+                      }}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          void allocateIncomeManually()
+                        }
+                      }}
+                      disabled={!hasUnallocatedIncome}
+                      aria-label="Manual budget allocation amount"
+                    />
+                  </div>
+                  <button
+                    className="budget-allocation-button"
+                    onClick={() => void allocateIncomeManually()}
+                    disabled={!hasUnallocatedIncome}
+                  >
+                    Allocate
+                  </button>
+                </div>
+
+                <div className="budget-category-chip-row" role="group" aria-label="Budget category target">
+                  {activeMonth.categories.map(category => (
+                    <button
+                      key={category.key}
+                      className={`budget-category-chip ${selectedAllocationCategory === category.key ? 'active' : ''}`}
+                      style={{ '--category-color': category.color } as React.CSSProperties}
+                      onClick={() => setSelectedAllocationCategory(category.key)}
+                      disabled={!hasUnallocatedIncome}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  className="budget-auto-allocate-btn"
+                  onClick={() => void autoAllocateUnallocatedIncome()}
+                  disabled={!hasUnallocatedIncome}
+                >
+                  Auto Allocate
+                </button>
+              </div>
+            )}
+
+            {allocationError && <span className="budget-allocation-error">{allocationError}</span>}
+          </section>
+
           <section className="columns">
             {activeMonth.categories.map(cat => {
-              const baseBudget = Math.round(activeMonth.monthlyIncome * cat.percentage / 100)
-              const budget = baseBudget + (cat.extraFunds ?? 0)
+              const budget = cat.allocatedFunds ?? 0
               const catTransactions = activeMonth.transactions.filter(t => t.category === cat.key)
               return (
                 <BudgetColumn
@@ -766,7 +920,6 @@ export default function App() {
                   budget={budget}
                   transactions={catTransactions}
                   onAddTransaction={addTransaction}
-                  onAddCategoryFunds={addCategoryFunds}
                   presets={CATEGORY_PRESETS[cat.key] || []}
                   readOnly={isReadOnly}
                 />

@@ -81,13 +81,6 @@
   font-family: 'JetBrains Mono', monospace;
 }
 
-.col-boost {
-  color: var(--col-accent);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.68rem;
-  font-weight: 800;
-}
-
 /* ── Amount blocks ── */
 .col-amounts {
   display: grid;
@@ -259,15 +252,7 @@
 }
 
 /* ── Add button ── */
-.column-actions {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 1fr;
-  margin-top: auto;
-}
-
-.add-btn,
-.boost-btn {
+.add-btn {
   width: 100%;
   padding: 12px;
   background: transparent;
@@ -278,95 +263,11 @@
   font-weight: 600;
   cursor: pointer;
   letter-spacing: 0.02em;
+  margin-top: auto;
   transition: background 0.15s, color 0.15s;
 }
 
-.add-btn:hover,
-.boost-btn:hover {
+.add-btn:hover {
   background: var(--col-accent);
   color: #0d1117;
-}
-
-.boost-btn {
-  border-style: solid;
-}
-
-.add-funds-form {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-}
-
-.add-funds-input-wrap {
-  position: relative;
-}
-
-.add-funds-dollar {
-  color: #6b7280;
-  font-family: 'JetBrains Mono', monospace;
-  left: 12px;
-  pointer-events: none;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.add-funds-input {
-  background: #12172a;
-  border: 1px solid #2a2f42;
-  border-radius: 8px;
-  color: #f0f2f8;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-  height: 38px;
-  outline: none;
-  padding: 0 10px 0 26px;
-  width: 100%;
-}
-
-.add-funds-input:focus {
-  border-color: var(--col-accent);
-}
-
-.add-funds-input::-webkit-outer-spin-button,
-.add-funds-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-}
-
-.add-funds-input[type=number] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.add-funds-save,
-.add-funds-cancel {
-  background: #12172a;
-  border: 1px solid #2a2f42;
-  border-radius: 8px;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 800;
-  height: 38px;
-  padding: 0 10px;
-}
-
-.add-funds-save {
-  background: color-mix(in srgb, var(--col-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--col-accent) 45%, transparent);
-  color: var(--col-accent);
-}
-
-.add-funds-error {
-  color: #ef4444;
-  font-size: 0.72rem;
-  font-weight: 700;
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 640px) {
-  .column-actions,
-  .add-funds-form {
-    grid-template-columns: 1fr;
-  }
 }

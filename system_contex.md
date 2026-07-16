@@ -161,7 +161,7 @@ For the shared savings dashboard, create the savings state tables and default bu
 ## Data Structures & Domains
 
 ### Monthly Income
-`months.monthly_income` stores the active month's cumulative income budget. The UI supports adding paycheck amounts as they arrive while preserving an edit-total control for corrections. New months start with zero income and inherit category percentages. The new-month setup banner appears when the latest stored month is already past or when fewer than 7 days remain in the latest stored month.
+`months.monthly_income` stores the active month's cumulative income received. The UI supports adding paycheck amounts as they arrive while preserving an edit-total control for corrections. New paychecks increase the budget page's unallocated income pool first; users then manually allocate dollars to a category or auto-allocate the pool by the category percentages. New months start with zero income, zero allocated category funds, and inherited category percentages. The new-month setup banner appears when the latest stored month is already past or when fewer than 7 days remain in the latest stored month.
 
 ### Category Allocations
 A rigid framework partitioning monthly income across dynamic categories:
@@ -169,7 +169,7 @@ A rigid framework partitioning monthly income across dynamic categories:
 * **Future (30%):** Forward wealth generation and liabilities (Retirement, Savings, Debt, Roth).
 * **Joy (10%):** Guilt-free lifestyle spending (Going out, Alcohol, Games, Joy Bank rollovers).
 * **Tithe (10%):** Giving allocation tracked as its own first-class budget category.
-Each category can also hold `extraFunds`, persisted as `categories.extra_funds`, for one-off money like gifts. Extra funds increase that category's spendable budget without changing `monthly_income` or the percentage allocation, and spending consumes extra funds before reducing the dashboard's monthly remaining amount.
+Category percentages are auto-allocation weights, not live budget formulas. Each category holds `allocatedFunds`, persisted in the existing `categories.extra_funds` column for compatibility, and that value is the category card's spendable budget. The budget page maintains an implicit unallocated pool as `monthly_income - sum(allocatedFunds)`.
 
 ### Joy Split
 Joy remains a single top-level category to preserve the four-column dashboard. Inside the Joy column, the app splits the Joy budget 50/50 between Joshua and Sav and tracks each Joy transaction with `joyOwner`. Legacy Joy transactions without `joyOwner` display under Joshua by default.
