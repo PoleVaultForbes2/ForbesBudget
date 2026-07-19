@@ -1,5 +1,5 @@
 .account-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(2,6,12,.75); backdrop-filter: blur(5px); }
-.account-modal { width: min(100%, 440px); box-sizing: border-box; padding: 26px; border: 1px solid #303a47; border-radius: 18px; background: #121820; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
+.account-modal { width: min(100%, 440px); max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box; padding: 26px; border: 1px solid #303a47; border-radius: 18px; background: #121820; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
 .account-modal-header { display: flex; align-items: flex-start; justify-content: space-between; }
 .account-modal-header span { color: #4ade80; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .account-modal-header h2 { margin: 4px 0 0; color: #f8fafc; }
@@ -9,6 +9,14 @@
 .account-modal input { padding: 11px 12px; border: 1px solid #35404e; border-radius: 10px; outline: none; background: #0c1117; color: #fff; font: inherit; }
 .account-modal input:focus { border-color: #4ade80; }
 .account-error { color: #fca5a5; font-size: 13px; }
+.account-success { color: #86efac; font-size: 13px; }
+.password-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid #293340; }
+.password-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0; border: 0; background: transparent; color: #e2e8f0; font: inherit; font-weight: 800; cursor: pointer; }
+.password-toggle span:last-child { color: #4ade80; font-size: 21px; font-weight: 400; }
+.password-fields { padding-top: 2px; }
+.password-save { width: 100%; margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 9px; background: #334155; color: #f8fafc; font-weight: 800; cursor: pointer; }
+.password-save:hover { background: #41526a; }
+.password-save:disabled { opacity: .55; cursor: not-allowed; }
 .account-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 25px; }
 .account-actions button { padding: 10px 14px; border-radius: 9px; font-weight: 800; cursor: pointer; }
 .account-signout { border: 1px solid #4b5563; background: transparent; color: #cbd5e1; }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { UserProfile } from '../types/budget'
+import { updatePassword } from '../api/authApi'
 import './AccountSettings.css'
 
 interface Props {
@@ -14,6 +15,12 @@ export default function AccountSettings({ profile, onSave, onClose, onSignOut }:
   const [partnerName, setPartnerName] = useState(profile.partnerName)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordBusy, setPasswordBusy] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [passwordError, setPasswordError] = useState(false)
 
   async function save() {
     if (username.trim().length < 2) {
@@ -29,6 +36,36 @@ export default function AccountSettings({ profile, onSave, onClose, onSignOut }:
       setError(saveError instanceof Error ? saveError.message : 'Could not update your account.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function changePassword() {
+    setPasswordMessage('')
+    setPasswordError(false)
+    if (newPassword.length < 8) {
+      setPasswordMessage('Password must be at least 8 characters.')
+      setPasswordError(true)
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage('Passwords do not match.')
+      setPasswordError(true)
+      return
+    }
+
+    setPasswordBusy(true)
+    try {
+      await updatePassword(newPassword)
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordMessage('Password updated successfully.')
+    } catch (updateError) {
+      setPasswordMessage(
+        updateError instanceof Error ? updateError.message : 'Could not update your password.'
+      )
+      setPasswordError(true)
+    } finally {
+      setPasswordBusy(false)
     }
   }
 
@@ -57,6 +94,64 @@ export default function AccountSettings({ profile, onSave, onClose, onSignOut }:
           />
         </label>
         {error && <p className="account-error">{error}</p>}
+
+        <div className="password-section">
+          <button
+            className="password-toggle"
+            type="button"
+            onClick={() => {
+              setPasswordOpen(open => !open)
+              setPasswordMessage('')
+              setPasswordError(false)
+            }}
+            aria-expanded={passwordOpen}
+          >
+            <span>Change password</span>
+            <span aria-hidden="true">{passwordOpen ? '−' : '+'}</span>
+          </button>
+
+          {passwordOpen && (
+            <div className="password-fields">
+              <label>
+                <span>New password</span>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </label>
+              <label>
+                <span>Confirm new password</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={event => setConfirmPassword(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') void changePassword()
+                  }}
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </label>
+              {passwordMessage && (
+                <p className={passwordError ? 'account-error' : 'account-success'}>
+                  {passwordMessage}
+                </p>
+              )}
+              <button
+                className="password-save"
+                type="button"
+                onClick={() => void changePassword()}
+                disabled={passwordBusy || !newPassword || !confirmPassword}
+              >
+                {passwordBusy ? 'Updating...' : 'Update password'}
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="account-actions">
           <button className="account-signout" onClick={() => void onSignOut()}>Sign out</button>
           <button className="account-save" onClick={() => void save()} disabled={busy}>

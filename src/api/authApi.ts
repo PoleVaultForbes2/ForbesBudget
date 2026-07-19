@@ -45,6 +45,11 @@ export async function signOut(): Promise<void> {
   if (error) throw error
 }
 
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+}
+
 export async function fetchProfile(user: User): Promise<UserProfile> {
   const { data, error } = await supabase
     .from('profiles')
