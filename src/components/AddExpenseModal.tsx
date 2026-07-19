@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category, JoyOwner, Transaction } from '../types/budget'
-import { DEFAULT_JOY_OWNER, JOY_OWNER_OPTIONS } from '../lib/joyOwners'
+import { DEFAULT_JOY_OWNER, getJoyOwnerOptions } from '../lib/joyOwners'
+import type { JoyOwnerLabels } from '../lib/joyOwners'
 import './AddExpenseModal.css'
 
 interface Props {
@@ -10,11 +11,12 @@ interface Props {
   presets: string[]
   onAdd: (t: Omit<Transaction, 'id'>) => void
   onClose: () => void
+  joyOwnerLabels: JoyOwnerLabels
 }
 
 const today = () => new Date().toISOString().split('T')[0]
 
-export default function AddExpenseModal({ category, categoryLabel, accentColor, presets, onAdd, onClose }: Props) {
+export default function AddExpenseModal({ category, categoryLabel, accentColor, presets, onAdd, onClose, joyOwnerLabels }: Props) {
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(today())
   const [amount, setAmount] = useState('')
@@ -22,6 +24,7 @@ export default function AddExpenseModal({ category, categoryLabel, accentColor, 
   const [joyOwner, setJoyOwner] = useState<JoyOwner>(DEFAULT_JOY_OWNER)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const isJoyCategory = category === 'joy'
+  const joyOwnerOptions = getJoyOwnerOptions(joyOwnerLabels)
 
   function validate() {
     const e: Record<string, string> = {}
@@ -62,7 +65,7 @@ export default function AddExpenseModal({ category, categoryLabel, accentColor, 
             <div className="joy-owner-section">
               <span className="field-label">Joy Fund</span>
               <div className="joy-owner-toggle" role="group" aria-label="Joy fund owner">
-                {JOY_OWNER_OPTIONS.map(owner => (
+                {joyOwnerOptions.map(owner => (
                   <button
                     key={owner.key}
                     type="button"

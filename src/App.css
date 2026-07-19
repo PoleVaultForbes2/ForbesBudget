@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
 /* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -24,9 +26,6 @@ body {
   min-height: 100vh;
 }
 
-/* Google Fonts — Inter + JetBrains Mono */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
-
 /* ── App shell ── */
 .app {
   min-height: 100vh;
@@ -50,6 +49,53 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.account-btn,
+.settings-btn {
+  border: 1px solid var(--border);
+  background: #121720;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.account-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.account-avatar {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, .16);
+  color: var(--green);
+}
+
+.settings-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.account-btn:hover,
+.settings-btn:hover {
+  border-color: #465266;
+  background: #19202a;
 }
 
 .brand-icon {
@@ -455,6 +501,8 @@ body {
 }
 
 @media (max-width: 480px) {
+  .account-btn > span:last-child { display: none; }
+  .account-btn { padding-right: 6px; }
   .app-main {
     padding: 20px 16px 60px;
   }

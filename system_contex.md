@@ -29,12 +29,17 @@ This document details the architectural boundaries, tech stack, and deployment e
 * **Current State:** Persistent storage is handled through Supabase using the official `@supabase/supabase-js` client.
 * **Supabase Client:** `src/lib/supabaseClient.ts` creates and exports the shared `supabase` client using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env.local`.
 * **Data Access Layer:** `src/api/budgetApi.ts` is the app's storage boundary. It fetches and mutates the `months`, `categories`, `transactions`, `savings_state`, `savings_goals`, and `savings_transactions` tables, then maps database snake_case rows into the React app's camelCase state shapes.
-* **App Loading:** `App.tsx` calls `fetchAllMonths()` on startup. If no month exists yet, it creates the current month in Supabase with zero income and default categories.
+* **Authentication:** Supabase Auth provides email/password sign-up, login, persistent sessions, and sign-out. `src/api/authApi.ts` owns authentication and profile operations. The app never loads financial data without an authenticated session.
+* **User Isolation:** Every financial row carries `user_id`. Row Level Security policies compare it to `auth.uid()`, including parent ownership checks for category, transaction, goal, and savings-activity inserts. The browser's anon/publishable key cannot bypass these policies.
+* **Profiles:** `profiles` stores the account username and editable partner display name. These labels drive the two Joy Fund owners and the personal Joy Bank labels without changing legacy Joy owner keys.
+* **App Loading:** `App.tsx` waits for an authenticated session, then loads only that user's profile, months, and savings. If that account has no month yet, it creates the current month with zero income and default categories.
 * **Category Migrations:** Existing Supabase months are not auto-mutated during app startup. When adding a new category, update constraints and insert category rows manually in Supabase.
 * **Mutation Pattern:** Budget actions use optimistic local UI updates, write through to Supabase, and roll back with a save-error toast if the database write fails.
 * **Local State Role:** React state remains the in-memory UI state for the active session. `localStorage` is no longer the source of truth for budget data.
 
 ### Database Schema
+
+The base schema below documents the original single-household tables. The authoritative multi-user changes are in `supabase/migrations/202607190001_multi_user_auth.sql`; deployment and legacy-data ownership steps are in `AUTH_SETUP.md`.
 
 -- ════════════════════════════════════════════════════════════════
 -- Budget App — Supabase Schema

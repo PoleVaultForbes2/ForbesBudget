@@ -20,7 +20,11 @@ import {
   normalizeSavingsState,
 } from '../lib/savings'
 
-const SAVINGS_STATE_ID = 'shared'
+async function requireUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) throw error ?? new Error('You must be signed in to access budget data.')
+  return data.user.id
+}
 
 function isMissingTableError(error: unknown): boolean {
   return (
@@ -100,8 +104,9 @@ function mapSavingsState(
   })
 }
 
-function toCategoryInsert(monthId: string, category: CategoryConfig) {
+function toCategoryInsert(userId: string, monthId: string, category: CategoryConfig) {
   return {
+    user_id: userId,
     month_id: monthId,
     key: category.key,
     label: category.label,
@@ -112,18 +117,20 @@ function toCategoryInsert(monthId: string, category: CategoryConfig) {
   }
 }
 
-function toSavingsGoalUpsert(goal: SavingsGoal) {
+function toSavingsGoalUpsert(userId: string, goal: SavingsGoal) {
   return {
-    state_id: SAVINGS_STATE_ID,
+    user_id: userId,
+    state_id: userId,
     key: goal.key,
     label: goal.label,
     balance: goal.balance,
   }
 }
 
-function toSavingsTransactionInsert(transaction: Omit<SavingsTransaction, 'id'>) {
+function toSavingsTransactionInsert(userId: string, transaction: Omit<SavingsTransaction, 'id'>) {
   return {
-    state_id: SAVINGS_STATE_ID,
+    user_id: userId,
+    state_id: userId,
     type: transaction.type,
     amount: transaction.amount,
     description: transaction.description,
@@ -150,10 +157,11 @@ function mapMonth(
 // ─── Fetch everything needed on app load ────────────────────────
 
 export async function fetchAllMonths(): Promise<MonthRecord[]> {
+  const userId = await requireUserId()
   const [monthsRes, categoriesRes, transactionsRes] = await Promise.all([
-    supabase.from('months').select('*').order('month_key', { ascending: true }),
-    supabase.from('categories').select('*'),
-    supabase.from('transactions').select('*'),
+    supabase.from('months').select('*').eq('user_id', userId).order('month_key', { ascending: true }),
+    supabase.from('categories').select('*').eq('user_id', userId),
+    supabase.from('transactions').select('*').eq('user_id', userId),
   ])
 
   if (monthsRes.error) throw monthsRes.error
@@ -167,13 +175,14 @@ export async function fetchAllMonths(): Promise<MonthRecord[]> {
   return months.map(m => mapMonth(m, categories, transactions))
 }
 
-async function createDefaultSavingsState(): Promise<SavingsState> {
+async function createDefaultSavingsState(userId: string): Promise<SavingsState> {
   const normalized = normalizeSavingsState(DEFAULT_SAVINGS_STATE)
 
   const { error: stateErr } = await supabase
     .from('savings_state')
     .upsert({
-      id: SAVINGS_STATE_ID,
+      id: userId,
+      user_id: userId,
       total_savings: normalized.totalSavings,
       unallocated: normalized.unallocated,
       updated_at: new Date().toISOString(),
@@ -186,7 +195,7 @@ async function createDefaultSavingsState(): Promise<SavingsState> {
 
   const { error: goalsErr } = await supabase
     .from('savings_goals')
-    .upsert(normalized.goals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
+    .upsert(normalized.goals.map(goal => toSavingsGoalUpsert(userId, goal)), { onConflict: 'state_id,key' })
 
   if (goalsErr) {
     if (isMissingTableError(goalsErr) || isCheckConstraintError(goalsErr)) {
@@ -198,24 +207,25 @@ async function createDefaultSavingsState(): Promise<SavingsState> {
 }
 
 export async function fetchSavingsState(): Promise<SavingsState> {
+  const userId = await requireUserId()
   const { data: stateRow, error: stateErr } = await supabase
     .from('savings_state')
     .select('*')
-    .eq('id', SAVINGS_STATE_ID)
+    .eq('id', userId)
     .maybeSingle()
 
   if (stateErr) throw stateErr
-  if (!stateRow) return createDefaultSavingsState()
+  if (!stateRow) return createDefaultSavingsState(userId)
 
   const [goalsRes, transactionsRes] = await Promise.all([
     supabase
       .from('savings_goals')
       .select('*')
-      .eq('state_id', SAVINGS_STATE_ID),
+      .eq('state_id', userId),
     supabase
       .from('savings_transactions')
       .select('*')
-      .eq('state_id', SAVINGS_STATE_ID)
+      .eq('state_id', userId)
       .order('created_at', { ascending: false }),
   ])
 
@@ -235,7 +245,7 @@ export async function fetchSavingsState(): Promise<SavingsState> {
   if (missingGoals.length > 0) {
     const { error: missingErr } = await supabase
       .from('savings_goals')
-      .upsert(missingGoals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
+      .upsert(missingGoals.map(goal => toSavingsGoalUpsert(userId, goal)), { onConflict: 'state_id,key' })
 
     if (missingErr) {
       if (!isCheckConstraintError(missingErr)) throw missingErr
@@ -245,7 +255,8 @@ export async function fetchSavingsState(): Promise<SavingsState> {
 
   const defaultGoalRows: DbSavingsGoalRow[] = missingGoals.map(goal => ({
     id: '',
-    state_id: SAVINGS_STATE_ID,
+    user_id: userId,
+    state_id: userId,
     key: goal.key,
     label: goal.label,
     balance: goal.balance,
@@ -259,12 +270,14 @@ export async function fetchSavingsState(): Promise<SavingsState> {
 }
 
 export async function updateSavingsState(savingsState: SavingsState): Promise<void> {
+  const userId = await requireUserId()
   const normalized = normalizeSavingsState(savingsState)
 
   const { error: stateErr } = await supabase
     .from('savings_state')
     .upsert({
-      id: SAVINGS_STATE_ID,
+      id: userId,
+      user_id: userId,
       total_savings: normalized.totalSavings,
       unallocated: normalized.unallocated,
       updated_at: new Date().toISOString(),
@@ -274,7 +287,7 @@ export async function updateSavingsState(savingsState: SavingsState): Promise<vo
 
   const { error: goalsErr } = await supabase
     .from('savings_goals')
-    .upsert(normalized.goals.map(toSavingsGoalUpsert), { onConflict: 'state_id,key' })
+    .upsert(normalized.goals.map(goal => toSavingsGoalUpsert(userId, goal)), { onConflict: 'state_id,key' })
 
   if (goalsErr) throw goalsErr
 }
@@ -282,9 +295,10 @@ export async function updateSavingsState(savingsState: SavingsState): Promise<vo
 export async function insertSavingsTransaction(
   transaction: Omit<SavingsTransaction, 'id'>
 ): Promise<SavingsTransaction> {
+  const userId = await requireUserId()
   const { data, error } = await supabase
     .from('savings_transactions')
-    .insert(toSavingsTransactionInsert(transaction))
+    .insert(toSavingsTransactionInsert(userId, transaction))
     .select()
     .single()
 
@@ -308,15 +322,16 @@ export async function createMonth(
   monthlyIncome: number,
   categories: CategoryConfig[]
 ): Promise<MonthRecord> {
+  const userId = await requireUserId()
   const { data: monthRow, error: monthErr } = await supabase
     .from('months')
-    .insert({ month_key: monthKey, monthly_income: monthlyIncome, closed_out: false })
+    .insert({ user_id: userId, month_key: monthKey, monthly_income: monthlyIncome, closed_out: false })
     .select()
     .single()
 
   if (monthErr) throw monthErr
 
-  const categoryInserts = categories.map(c => toCategoryInsert(monthRow.id, c))
+  const categoryInserts = categories.map(c => toCategoryInsert(userId, monthRow.id, c))
 
   const { data: categoryRows, error: catErr } = await supabase
     .from('categories')
@@ -382,7 +397,9 @@ export async function insertTransaction(
   monthId: string,
   t: Omit<Transaction, 'id'>
 ): Promise<Transaction> {
+  const userId = await requireUserId()
   const transactionInsert = {
+    user_id: userId,
     month_id: monthId,
     category: t.category,
     description: t.description,

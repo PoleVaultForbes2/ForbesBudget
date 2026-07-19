@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SavingsGoalKey, SavingsState } from '../types/budget'
+import type { JoyOwnerLabels } from '../lib/joyOwners'
 import {
   AUTO_ALLOCATION_WEIGHTS,
   getAllocatedSavingsTotal,
@@ -24,6 +25,7 @@ interface Props {
     toGoalKey: SavingsGoalKey,
     amount: number
   ) => void | Promise<void>
+  joyOwnerLabels: JoyOwnerLabels
 }
 
 export default function SavingsPage({
@@ -34,6 +36,7 @@ export default function SavingsPage({
   onAutoAllocate,
   onWithdraw,
   onTransfer,
+  joyOwnerLabels,
 }: Props) {
   const [editingTotal, setEditingTotal] = useState(false)
   const [totalInput, setTotalInput] = useState('')
@@ -53,6 +56,14 @@ export default function SavingsPage({
   const [transferToGoal, setTransferToGoal] = useState<SavingsGoalKey>('debt')
   const [transferError, setTransferError] = useState('')
 
+  const displayGoals = savings.goals.map(goal => ({
+    ...goal,
+    label: goal.key === 'josh_joy_bank'
+      ? `${joyOwnerLabels.joshua} Joy Bank`
+      : goal.key === 'wifey_joy_bank'
+        ? `${joyOwnerLabels.sav} Joy Bank`
+        : goal.label,
+  }))
   const allocatedTotal = getAllocatedSavingsTotal(savings.goals)
   const hasUnallocated = savings.unallocated > 0
   const withdrawalSource = savings.goals.find(goal => goal.key === withdrawalGoal)
@@ -289,7 +300,7 @@ export default function SavingsPage({
           </div>
 
           <div className="goal-chip-row" role="group" aria-label="Savings goal target">
-            {savings.goals.map(goal => (
+            {displayGoals.map(goal => (
               <button
                 key={goal.key}
                 className={`goal-chip ${selectedGoal === goal.key ? 'active' : ''}`}
@@ -348,7 +359,7 @@ export default function SavingsPage({
                   label="Withdrawal amount"
                 />
                 <GoalSelect
-                  goals={savings.goals}
+                  goals={displayGoals}
                   value={withdrawalGoal}
                   onChange={setWithdrawalGoal}
                 />
@@ -387,7 +398,7 @@ export default function SavingsPage({
                   label="Transfer amount"
                 />
                 <GoalSelect
-                  goals={savings.goals}
+                  goals={displayGoals}
                   value={transferFromGoal}
                   onChange={value => {
                     setTransferFromGoal(value)
@@ -396,7 +407,7 @@ export default function SavingsPage({
                   label="From"
                 />
                 <GoalSelect
-                  goals={savings.goals}
+                  goals={displayGoals}
                   value={transferToGoal}
                   onChange={value => {
                     setTransferToGoal(value)
@@ -415,7 +426,7 @@ export default function SavingsPage({
       </section>
 
       <section className="savings-goals-grid">
-        {savings.goals.map(goal => {
+        {displayGoals.map(goal => {
           const color = SAVINGS_GOAL_COLORS[goal.key]
           const autoWeight = AUTO_ALLOCATION_WEIGHTS[goal.key]
           const share = savings.totalSavings > 0
@@ -455,7 +466,7 @@ export default function SavingsPage({
           <div className="savings-activity-list">
             {savings.transactions.map(transaction => {
               const goal = transaction.goalKey
-                ? savings.goals.find(item => item.key === transaction.goalKey)
+                ? displayGoals.find(item => item.key === transaction.goalKey)
                 : undefined
               const isWithdrawal = transaction.type === 'withdrawal'
 

@@ -1,6 +1,7 @@
 // App.tsx
 
 import { useState, useEffect, useCallback } from 'react'
+import type { User } from '@supabase/supabase-js'
 import type {
   MonthRecord,
   Transaction,
@@ -9,6 +10,7 @@ import type {
   SavingsState,
   SavingsGoalKey,
   SavingsTransaction,
+  UserProfile,
 } from './types/budget'
 import BudgetColumn from './components/BudgetColumn'
 import TransactionLog from './components/TransactionLog'
@@ -17,6 +19,8 @@ import SavingsPage from './components/SavingsPage'
 import NewMonthBanner from './components/NewMonthBanner'
 import { LoadingScreen, ErrorScreen } from './components/StatusScreen'
 import SaveErrorToast from './components/SaveErrorToast'
+import AuthPage from './components/AuthPage'
+import AccountSettings from './components/AccountSettings'
 import {
   addSavingsInflow,
   autoAllocateSavings,
@@ -31,6 +35,8 @@ import {
   withdrawSavings,
 } from './lib/savings'
 import * as api from './api/budgetApi'
+import * as authApi from './api/authApi'
+import { supabase } from './lib/supabaseClient'
 import './App.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -111,6 +117,9 @@ type LoadState = 'loading' | 'error' | 'ready'
 type IncomeMode = 'idle' | 'add' | 'edit'
 
 export default function App() {
+  const [authChecking, setAuthChecking] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadErrorMsg, setLoadErrorMsg] = useState('')
   const [months, setMonths] = useState<MonthRecord[]>([])
@@ -125,14 +134,42 @@ export default function App() {
   const [selectedAllocationCategory, setSelectedAllocationCategory] = useState<Category>('essentials')
   const [allocationError, setAllocationError] = useState('')
   const [showCategorySettings, setShowCategorySettings] = useState(false)
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      setUser(data.session?.user ?? null)
+      setAuthChecking(false)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setAuthChecking(false)
+      if (!session) {
+        setProfile(null)
+        setMonths([])
+        setSavings(null)
+        setLoadState('loading')
+      }
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
 
   // ── Initial fetch from Supabase ──
   const loadData = useCallback(async () => {
+    if (!user) return
     setLoadState('loading')
     try {
-      const [initialMonths, fetchedSavings] = await Promise.all([
+      const [initialMonths, fetchedSavings, fetchedProfile] = await Promise.all([
         api.fetchAllMonths(),
         api.fetchSavingsState(),
+        authApi.fetchProfile(user),
       ])
       let fetched = initialMonths
 
@@ -150,6 +187,7 @@ export default function App() {
 
       setMonths(fetched)
       setSavings(normalizeSavingsState(fetchedSavings))
+      setProfile(fetchedProfile)
       const latestKey = fetched.map(m => m.monthKey).sort().slice(-1)[0]
       setActiveMonthKey(latestKey)
       setLoadState('ready')
@@ -160,11 +198,21 @@ export default function App() {
       )
       setLoadState('error')
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
-    void Promise.resolve().then(loadData)
-  }, [loadData])
+    if (user) void Promise.resolve().then(loadData)
+  }, [loadData, user])
+
+  async function saveProfileNames(username: string, partnerName: string) {
+    if (!user) return
+    setProfile(await authApi.updateProfileNames(user.id, username, partnerName))
+  }
+
+  async function handleSignOut() {
+    setShowAccountSettings(false)
+    await authApi.signOut()
+  }
 
   // ── Derived values ──
   const activeMonth = months.find(m => m.monthKey === activeMonthKey)
@@ -651,9 +699,16 @@ export default function App() {
 
   // ── Render states ──
 
+  if (authChecking) return <LoadingScreen />
+  if (!user) return <AuthPage />
   if (loadState === 'loading') return <LoadingScreen />
   if (loadState === 'error') return <ErrorScreen message={loadErrorMsg} onRetry={loadData} />
-  if (!activeMonth || !savings) return <LoadingScreen />
+  if (!activeMonth || !savings || !profile) return <LoadingScreen />
+
+  const joyOwnerLabels = {
+    joshua: profile.username,
+    sav: profile.partnerName || 'Partner',
+  }
 
   return (
     <div className="app">
@@ -678,14 +733,24 @@ export default function App() {
           </button>
         </div>
 
-        <button
-          className="settings-btn"
-          onClick={() => setShowCategorySettings(true)}
-          title="Edit category percentages"
-          aria-label="Category settings"
-        >
-          ⚙️
-        </button>
+        <div className="header-actions">
+          <button
+            className="account-btn"
+            onClick={() => setShowAccountSettings(true)}
+            title="Account and Joy Fund names"
+          >
+            <span className="account-avatar">{profile.username.charAt(0).toUpperCase()}</span>
+            <span>{profile.username}</span>
+          </button>
+          <button
+            className="settings-btn"
+            onClick={() => setShowCategorySettings(true)}
+            title="Edit category percentages"
+            aria-label="Category settings"
+          >
+            ⚙️
+          </button>
+        </div>
       </header>
 
       {page === 'savings' ? (
@@ -697,6 +762,7 @@ export default function App() {
           onAutoAllocate={autoAllocateUnallocatedSavings}
           onWithdraw={subtractFromSavingsGoal}
           onTransfer={moveSavingsBetweenGoals}
+          joyOwnerLabels={joyOwnerLabels}
         />
       ) : (
         <main className="app-main">
@@ -922,6 +988,7 @@ export default function App() {
                   onAddTransaction={addTransaction}
                   presets={CATEGORY_PRESETS[cat.key] || []}
                   readOnly={isReadOnly}
+                  joyOwnerLabels={joyOwnerLabels}
                 />
               )
             })}
@@ -933,6 +1000,7 @@ export default function App() {
             categories={activeMonth.categories}
             onDelete={deleteTransaction}
             readOnly={isReadOnly}
+            joyOwnerLabels={joyOwnerLabels}
           />
         </main>
       )}
@@ -943,6 +1011,15 @@ export default function App() {
           categories={activeMonth.categories}
           onUpdateCategory={updateCategoryPercentage}
           onClose={() => setShowCategorySettings(false)}
+        />
+      )}
+
+      {showAccountSettings && (
+        <AccountSettings
+          profile={profile}
+          onSave={saveProfileNames}
+          onClose={() => setShowAccountSettings(false)}
+          onSignOut={handleSignOut}
         />
       )}
 

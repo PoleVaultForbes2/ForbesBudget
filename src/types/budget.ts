@@ -10,6 +10,12 @@ export type SavingsGoalKey =
   | 'wifey_joy_bank'
 export type SavingsTransactionType = 'deposit' | 'withdrawal'
 
+export interface UserProfile {
+  userId: string
+  username: string
+  partnerName: string
+}
+
 export interface Transaction {
   id: string
   category: Category
@@ -71,6 +77,7 @@ export interface AppStorage {
 
 export interface DbMonthRow {
   id: string
+  user_id: string
   month_key: string
   monthly_income: number
   closed_out: boolean
@@ -79,6 +86,7 @@ export interface DbMonthRow {
 
 export interface DbCategoryRow {
   id: string
+  user_id: string
   month_id: string
   key: Category
   label: string
@@ -90,6 +98,7 @@ export interface DbCategoryRow {
 
 export interface DbTransactionRow {
   id: string
+  user_id: string
   month_id: string
   category: Category
   description: string
@@ -102,6 +111,7 @@ export interface DbTransactionRow {
 
 export interface DbSavingsStateRow {
   id: string
+  user_id: string
   total_savings: number
   unallocated: number
   updated_at: string
@@ -109,6 +119,7 @@ export interface DbSavingsStateRow {
 
 export interface DbSavingsGoalRow {
   id: string
+  user_id: string
   state_id: string
   key: SavingsGoalKey
   label: string
@@ -117,6 +128,7 @@ export interface DbSavingsGoalRow {
 
 export interface DbSavingsTransactionRow {
   id: string
+  user_id: string
   state_id: string
   type: SavingsTransactionType
   amount: number

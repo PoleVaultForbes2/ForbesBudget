@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category, Transaction, CategoryConfig } from '../types/budget'
 import { getJoyOwnerForTransaction, getJoyOwnerLabel } from '../lib/joyOwners'
+import type { JoyOwnerLabels } from '../lib/joyOwners'
 import './TransactionLog.css'
 
 interface Props {
@@ -8,9 +9,10 @@ interface Props {
   categories: CategoryConfig[]
   onDelete: (id: string) => void
   readOnly?: boolean
+  joyOwnerLabels: JoyOwnerLabels
 }
 
-export default function TransactionLog({ transactions, categories, onDelete, readOnly = false }: Props) {
+export default function TransactionLog({ transactions, categories, onDelete, joyOwnerLabels, readOnly = false }: Props) {
   const [activeTab, setActiveTab] = useState<Category | 'all'>('all')
 
   const filtered = transactions
@@ -74,7 +76,7 @@ export default function TransactionLog({ transactions, categories, onDelete, rea
                     {cfg.label}
                   </span>
                   {joyOwner && (
-                    <span className="log-owner-badge">{getJoyOwnerLabel(joyOwner)}</span>
+                    <span className="log-owner-badge">{getJoyOwnerLabel(joyOwner, joyOwnerLabels)}</span>
                   )}
                 </div>
                 <span className="log-date">{formatDate(t.date)}</span>

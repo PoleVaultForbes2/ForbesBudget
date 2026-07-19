@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CategoryConfig, Transaction } from '../types/budget'
-import { getJoyOwnerForTransaction, getJoyOwnerLabel, JOY_OWNER_OPTIONS } from '../lib/joyOwners'
+import { getJoyOwnerForTransaction, getJoyOwnerLabel, getJoyOwnerOptions } from '../lib/joyOwners'
+import type { JoyOwnerLabels } from '../lib/joyOwners'
 import AddExpenseModal from './AddExpenseModal'
 import './BudgetColumn.css'
 
@@ -11,6 +12,7 @@ interface Props {
   presets: string[]
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void
   readOnly? : boolean
+  joyOwnerLabels: JoyOwnerLabels
 }
 
 export default function BudgetColumn({
@@ -20,6 +22,7 @@ export default function BudgetColumn({
   presets,
   onAddTransaction,
   readOnly = false,
+  joyOwnerLabels,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -28,9 +31,10 @@ export default function BudgetColumn({
   const pct = budget > 0 ? Math.min(spent / budget, 1) : spent > 0 ? 1 : 0
   const overBudget = spent > budget
   const isJoyColumn = config.key === 'joy'
-  const joySplitBudget = budget / JOY_OWNER_OPTIONS.length
+  const joyOwnerOptions = getJoyOwnerOptions(joyOwnerLabels)
+  const joySplitBudget = budget / joyOwnerOptions.length
   const joySplits = isJoyColumn
-    ? JOY_OWNER_OPTIONS.map(owner => {
+    ? joyOwnerOptions.map(owner => {
         const ownerSpent = transactions
           .filter(t => getJoyOwnerForTransaction(t) === owner.key)
           .reduce((sum, t) => sum + t.amount, 0)
@@ -143,7 +147,7 @@ export default function BudgetColumn({
                     <span className="txn-desc">{t.description}</span>
                     <span className="txn-date">
                       {formatDate(t.date)}
-                      {joyOwner && ` - ${getJoyOwnerLabel(joyOwner)}`}
+                      {joyOwner && ` - ${getJoyOwnerLabel(joyOwner, joyOwnerLabels)}`}
                     </span>
                   </div>
                   <span className="txn-amount">${t.amount.toFixed(2)}</span>
@@ -168,6 +172,7 @@ export default function BudgetColumn({
           categoryLabel={config.label}
           accentColor={config.color}
           presets={presets || []}
+          joyOwnerLabels={joyOwnerLabels}
           onAdd={(t) => { onAddTransaction(t); setModalOpen(false) }}
           onClose={() => setModalOpen(false)}
         />

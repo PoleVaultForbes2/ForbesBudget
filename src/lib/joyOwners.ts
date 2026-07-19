@@ -2,18 +2,21 @@ import type { Category, JoyOwner } from '../types/budget'
 
 export const DEFAULT_JOY_OWNER: JoyOwner = 'joshua'
 
-export const JOY_OWNER_LABELS: Record<JoyOwner, string> = {
-  joshua: 'Josh',
-  sav: 'Wifey',
+export type JoyOwnerLabels = Record<JoyOwner, string>
+
+export const DEFAULT_JOY_OWNER_LABELS: JoyOwnerLabels = {
+  joshua: 'You',
+  sav: 'Partner',
 }
 
-export const JOY_OWNER_OPTIONS: Array<{ key: JoyOwner; label: string }> = [
-  { key: 'joshua', label: JOY_OWNER_LABELS.joshua },
-  { key: 'sav', label: JOY_OWNER_LABELS.sav },
-]
+export const JOY_OWNER_KEYS: JoyOwner[] = ['joshua', 'sav']
 
-export function getJoyOwnerLabel(owner: JoyOwner): string {
-  return JOY_OWNER_LABELS[owner]
+export function getJoyOwnerOptions(labels: JoyOwnerLabels) {
+  return JOY_OWNER_KEYS.map(key => ({ key, label: labels[key] }))
+}
+
+export function getJoyOwnerLabel(owner: JoyOwner, labels: JoyOwnerLabels): string {
+  return labels[owner]
 }
 
 export function getJoyOwnerForTransaction(transaction: {
